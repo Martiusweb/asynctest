@@ -1,0 +1,56 @@
+aiotest
+
+I would like to write an asyncio.unittest package providing a wrapper on top of
+the unittest package.
+
+The idea is to add a simple and comprehensive unit testing framework for
+asyncio projects and libraries, aiming at reducing the boilerplate, as well
+as unittest does for regular packages.
+
+Some of the things that will be useful:
+
+  * create and recycle a loop between each test,
+  * allow tests functions to be coroutines, and thus be executed on the loop
+    automatically,
+  * ensure the loop ran at the end of a test which is not a coroutine (ensure
+    we don't have a test which initializes a coroutine but won't run it),
+  * ensure a coroutine or callback won't block for too long (and other features
+    available through the debug mode of asyncio).
+
+Some of the things that will _probably_ be useful:
+
+  * allow to mock parts of the loop when required, such as:
+     - mock the selector,
+     - allow triggering fake selector events,
+     - control the loop clock (thus allowing to fast-forward to run callbacks
+       in the future)
+  * specific assertions such as "assert_scheduled", "assert_done",
+    "assert_cancelled", etc,
+  * make a test fail if the loop don't end in a clean state (uncaught
+    exception, unfreed resource, etc),
+  * an asyncio.unittest.mock module, which can mock a coroutine easily (the
+    trivial way is to mock a coroutine with a future which is done, for
+    instance).
+
+Some more complex/high level things I'd like to do, but which may not be
+included in the base "package"
+
+  * a mock system allowing to play an exact scenario of events which are
+    supposed to happen concurrently while the loop run (for instance, complex
+    network cases involving ConnectionReset, BrokenPipes, etc) - Currently in
+    my tests, I use actual sockets and yield from asyncio.sleep() to ensure
+    events happen in the order I expect on the loop, I don't really like it,
+  * on the other hand, some parts of the asyncio package currently never yield,
+    but may in the future, I'd like to find a way to test that my code doesn't
+    use assumptions like that (thus resulting in possible future race
+    conditions), maybe what I want is a kind of assert_future_done,
+    assert_event_occured, etc
+  * a collection of stream_pair() functions which would return a par of streams
+    connected to each other,
+  * a way to mock a program call (allowing to mock asynchronous process
+    spawning) - actually I'm not sure how I would do this.
+
+Most of those features are features I implemented or should have implemented in
+order to get a clean unit test codebase for my project(s) using asyncio.
+I am looking for a wishlist of features and feedbacks about what you missed
+when writting tests for asyncio libraries, or that made you not write tests.
