@@ -3,8 +3,12 @@
 Wrapper to unittest reducing the boilerplate when testing asyncio powered code.
 
 Features currently supported:
+
   * a new loop is issued and set as the default loop before each test, and
-    closed and disposed after.
+    closed and disposed after,
+
+  * a test method in a TestCase identified as a coroutine function or returning
+    a coroutine will run on the loop.
 """
 
 import asyncio
@@ -40,7 +44,6 @@ class TestCase(unittest.case.TestCase):
         self._unset_loop()
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
-    # TODO if the test is a coroutine, execute it on the loop
     def run(self, result=None):
         orig_result = result
         if result is None:
@@ -73,7 +76,7 @@ class TestCase(unittest.case.TestCase):
             if outcome.success:
                 outcome.expecting_failure = expecting_failure
                 with outcome.testPartExecutor(self, isTest=True):
-                    testMethod()
+                    self._run_test_method(testMethod)
                 outcome.expecting_failure = False
                 with outcome.testPartExecutor(self):
                     self._tearDown()
@@ -110,7 +113,7 @@ class TestCase(unittest.case.TestCase):
     def debug(self):
         self._setUp()
         try:
-            getattr(self, self._testMethodName)()
+            self._run_test_method(getattr(self, self._testMethodName))
             self._tearDown()
         except Exception:
             self._unset_loop()
@@ -119,6 +122,13 @@ class TestCase(unittest.case.TestCase):
         while self._cleanups:
             function, args, kwargs = self._cleanups.pop(-1)
             function(*args, **kwargs)
+
+    def _run_test_method(self, method):
+        # If the method is a coroutine or returns a coroutine, run it on the
+        # loop
+        result = method()
+        if asyncio.iscoroutine(result):
+            self.loop.run_until_complete(result)
 
 
 class FunctionTestCase(TestCase, unittest.FunctionTestCase):

@@ -66,6 +66,34 @@ class Test_TestCase(unittest.TestCase):
                 mock_loop.close.assert_called_with()
                 self.assertFalse(case.failing)
 
+    def test_coroutinefunction_executed(self):
+        class CoroutineFunctionTest(aiotest.TestCase):
+            ran = False
+
+            @asyncio.coroutine
+            def runTest(self):
+                self.ran = True
+                yield from []
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = CoroutineFunctionTest()
+                getattr(case, method)()
+                self.assertTrue(case.ran)
+
+    def test_coroutine_returned_executed(self):
+        class CoroutineTest(aiotest.TestCase):
+            ran = False
+
+            def runTest(self):
+                return asyncio.coroutine(lambda: setattr(self, 'ran', True))()
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = CoroutineTest()
+                getattr(case, method)()
+                self.assertTrue(case.ran)
+
 
 if __name__ == "__main__":
     unittest.main()
