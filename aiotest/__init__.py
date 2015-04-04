@@ -5,6 +5,6 @@ import unittest
 from unittest import *
 
 # Shadows unittest with our enhanced classes
-from .case import TestCase, FunctionTestCase
+from .case import TestCase, FunctionTestCase, ignore_loop
 
 __all__ = unittest.__all__

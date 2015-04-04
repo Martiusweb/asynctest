@@ -19,4 +19,5 @@ TestCase and FunctionTestCase
 
   - Initialize and close a loop created for each test,
   - if the test function is a coroutine function or returns a coroutine, it
-    will run on the loop.
+    will run on the loop,
+  - a test fails if the loop did not run during the test.

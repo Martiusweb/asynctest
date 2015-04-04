@@ -16,6 +16,7 @@ class Test:
         def test_foo(self):
             pass
 
+    @aiotest.ignore_loop
     class LoggingTestCase(aiotest.TestCase):
         def __init__(self, calls):
             super().__init__()
@@ -35,6 +36,7 @@ class Test_TestCase(unittest.TestCase):
     run_methods = ('run', 'debug', )
 
     def test_init_and_close_loop_for_test(self):
+        @aiotest.ignore_loop
         class LoopTest(aiotest.TestCase):
             failing = False
 
@@ -93,6 +95,42 @@ class Test_TestCase(unittest.TestCase):
                 case = CoroutineTest()
                 getattr(case, method)()
                 self.assertTrue(case.ran)
+
+    def test_fails_when_loop_didnt_run(self):
+        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+            Test.FooTestCase().debug()
+
+        result = Test.FooTestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+    def test_passes_when_ignore_loop_or_loop_run(self):
+        @aiotest.ignore_loop
+        class IgnoreLoopClassTest(Test.FooTestCase):
+            pass
+
+        class IgnoreLoopMethodTest(aiotest.TestCase):
+            @aiotest.ignore_loop
+            def runTest(self):
+                pass
+
+        class WithCoroutineTest(aiotest.TestCase):
+            @asyncio.coroutine
+            def runTest(self):
+                yield from []
+
+        class WithFunctionCallingLoopTest(aiotest.TestCase):
+            def runTest(self):
+                fut = asyncio.Future()
+                self.loop.call_soon(fut.set_result, None)
+                self.loop.run_until_complete(fut)
+
+        for test in (IgnoreLoopClassTest, IgnoreLoopMethodTest,
+                     WithCoroutineTest, WithFunctionCallingLoopTest):
+            with self.subTest(test=test):
+                test().debug()
+
+                result = test().run()
+                self.assertEqual(0, len(result.failures))
 
 
 if __name__ == "__main__":

@@ -8,10 +8,14 @@ Features currently supported:
     closed and disposed after,
 
   * a test method in a TestCase identified as a coroutine function or returning
-    a coroutine will run on the loop.
+    a coroutine will run on the loop,
+
+  * a test fails if the loop did not run during the test.
 """
 
 import asyncio
+import functools
+import types
 import unittest.case
 
 
@@ -19,16 +23,43 @@ class TestCase(unittest.case.TestCase):
     """
     For each test, a new loop is created and is set as the default loop. Test
     authors can retrieve this loop with the self.loop property.
+
+    A test which is a coroutine function or which returns a coroutine will run
+    on the loop.
+
+    Else, once the test returned, a final assertion on whether the loop ran or
+    not is checked. This allows to detect cases where a test author assume its
+    test will run tasks or callbacks on the loop, but it actually didn't. When
+    the test author doesn't need this assertion to be verified, the test
+    function or TestCase class can be decorated with @ignore_loop.
     """
     loop = None
 
     def _init_loop(self):
-        self.loop = asyncio.new_event_loop()
+        self.loop = self._patch_loop(asyncio.new_event_loop())
         asyncio.set_event_loop(self.loop)
 
     def _unset_loop(self):
         self.loop.close()
         self.loop = None
+
+    def _patch_loop(self, loop):
+        loop.__aiotest_ran = False
+
+        def wraps(method):
+            @functools.wraps(method)
+            def wrapper(self, *args, **kwargs):
+                try:
+                    return method(*args, **kwargs)
+                finally:
+                    loop.__aiotest_ran = True
+
+            return types.MethodType(wrapper, loop)
+
+        for method in ('run_forever', 'run_until_complete', ):
+            setattr(loop, method, wraps(getattr(loop, method)))
+
+        return loop
 
     def _setUp(self):
         self._init_loop()
@@ -129,9 +160,25 @@ class TestCase(unittest.case.TestCase):
         result = method()
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
+            return
+
+        if (getattr(self.__class__, "__aiotest_ignore_loop__", False) or
+                getattr(method, "__aiotest_ignore_loop__", False)):
+            return
+
+        if not self.loop.__aiotest_ran:
+            self.fail("Loop did not run during the test")
 
 
 class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
     Enables the same features as TestCase, but for FunctionTestCase.
     """
+
+
+def ignore_loop(test):
+    """
+    Ignore the error case where the loop did not run during the test.
+    """
+    test.__aiotest_ignore_loop__ = True
+    return test
