@@ -132,6 +132,45 @@ class Test_TestCase(unittest.TestCase):
                 result = test().run()
                 self.assertEqual(0, len(result.failures))
 
+    def test_setup_teardown_may_be_coroutines(self):
+        @aiotest.ignore_loop
+        class WithSetupFunction(Test.FooTestCase):
+            ran = False
+
+            def setUp(self):
+                WithSetupFunction.ran = True
+
+        @aiotest.ignore_loop
+        class WithSetupCoroutine(Test.FooTestCase):
+            ran = False
+
+            @asyncio.coroutine
+            def setUp(self):
+                WithSetupCoroutine.ran = True
+
+        @aiotest.ignore_loop
+        class WithTearDownFunction(Test.FooTestCase):
+            ran = False
+
+            def tearDown(self):
+                WithTearDownFunction.ran = True
+
+        @aiotest.ignore_loop
+        class WithTearDownCoroutine(Test.FooTestCase):
+            ran = False
+
+            def tearDown(self):
+                WithTearDownCoroutine.ran = True
+
+        for method in self.run_methods:
+            for call_mode in (WithSetupFunction, WithSetupCoroutine,
+                              WithTearDownFunction, WithTearDownCoroutine):
+                with self.subTest(method=method, case=call_mode.__name__):
+                    case = call_mode()
+                    call_mode.ran = False
+
+                    getattr(case, method)()
+                    self.assertTrue(case.ran)
 
 if __name__ == "__main__":
     unittest.main()

@@ -10,6 +10,8 @@ Features currently supported:
   * a test method in a TestCase identified as a coroutine function or returning
     a coroutine will run on the loop,
 
+  * setUp() and tearDown() methods can be coroutine functions,
+
   * a test fails if the loop did not run during the test.
 """
 
@@ -23,6 +25,9 @@ class TestCase(unittest.case.TestCase):
     """
     For each test, a new loop is created and is set as the default loop. Test
     authors can retrieve this loop with the self.loop property.
+
+    if setUp() and tearDown() are coroutine functions, they will run on the
+    loop.
 
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
@@ -65,14 +70,22 @@ class TestCase(unittest.case.TestCase):
         self._init_loop()
 
         try:
-            self.setUp()
+            if asyncio.iscoroutinefunction(self.setUp):
+                self.loop.run_until_complete(self.setUp())
+            else:
+                self.setUp()
         except:
             self._unset_loop()
             raise
 
     def _tearDown(self):
-        self.tearDown()
-        self._unset_loop()
+        try:
+            if asyncio.iscoroutinefunction(self.tearDown):
+                self.loop.run_until_complete(self.tearDown())
+            else:
+                self.tearDown()
+        finally:
+            self._unset_loop()
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
     def run(self, result=None):
