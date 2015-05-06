@@ -20,6 +20,8 @@ import functools
 import types
 import unittest.case
 
+from unittest.case import *  # NOQA
+
 
 class TestCase(unittest.case.TestCase):
     """

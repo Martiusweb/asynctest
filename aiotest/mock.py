@@ -12,6 +12,8 @@ Features currently supported:
 import asyncio
 import unittest.mock
 
+from unittest.mock import *  # NOQA
+
 DEFAULT = unittest.mock.DEFAULT
 
 
