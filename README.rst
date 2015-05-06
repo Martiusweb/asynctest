@@ -23,3 +23,24 @@ TestCase and FunctionTestCase
     will run on the loop,
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
   - a test fails if the loop did not run during the test.
+
+
+Mock and CoroutineMock
+~~~~~~~~~~~~~~~~~~~~~~
+
+  - CoroutineMock is a new Mock class which mocks a coroutine function, and
+    returns a coroutine when called,
+
+  - NonCallableMock, Mock and CoroutineMock can return CoroutineMock objects
+    when its attributes are get if there is a matching attribute in the spec
+    (or spec_set) object which is a coroutine function.
+
+
+Tests
+-----
+
+How to run the tests?
+
+::
+
+$ PYTHONPATH=. python -m unittest test

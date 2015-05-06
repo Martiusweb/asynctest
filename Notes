@@ -1,7 +1,17 @@
-aiotest
+Aiotest
 
 I would like to write an asyncio.unittest package providing a wrapper on top of
 the unittest package.
+
+Currently, supported features are described in the README and docstrings.
+
+The next features I plan to add are mocking features:
+
+  * when spec is specified, methods decorated with @asyncio.coroutine will be
+    coroutine mocks,
+
+Does it make sense to detect when a mock is called via "yield from" so we can
+make the mock behave like a coroutine even if the decorator is missing?
 
 The idea is to add a simple and comprehensive unit testing framework for
 asyncio projects and libraries, aiming at reducing the boilerplate, as well
@@ -9,11 +19,7 @@ as unittest does for regular packages.
 
 Some of the things that will be useful:
 
-  * create and recycle a loop between each test,
-  * allow tests functions to be coroutines, and thus be executed on the loop
-    automatically,
-  * ensure the loop ran at the end of a test which is not a coroutine (ensure
-    we don't have a test which initializes a coroutine but won't run it),
+  * when mocking,
   * ensure a coroutine or callback won't block for too long (and other features
     available through the debug mode of asyncio).
 
