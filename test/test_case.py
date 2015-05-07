@@ -172,5 +172,6 @@ class Test_TestCase(unittest.TestCase):
                     getattr(case, method)()
                     self.assertTrue(case.ran)
 
+
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,19 @@ class _Test_iscoroutinefunction:
 
 
 @inject_class
+class _Test_is_coroutine_property:
+    def test_is_coroutine_property(self, klass):
+        mock = klass()
+        self.assertFalse(mock.is_coroutine)
+
+        mock.is_coroutine = True
+        self.assertTrue(mock.is_coroutine)
+
+        mock = klass(is_coroutine=True)
+        self.assertTrue(mock.is_coroutine)
+
+
+@inject_class
 class _Test_subclass:
     def test_subclass(self, klass):
         unittest_klass = getattr(unittest.mock, self.class_to_test)
@@ -125,20 +138,17 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
 
 class Test_NonCallabableMock(unittest.TestCase, _Test_subclass,
                              _Test_iscoroutinefunction,
+                             _Test_is_coroutine_property,
                              _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
     class_to_test = 'NonCallableMock'
 
-    def test_is_coroutine_property(self):
-        klass = getattr(aiotest, self.class_to_test)
 
-        mock = klass()
-        self.assertFalse(mock.is_coroutine)
-
-        mock.is_coroutine = True
-        self.assertTrue(mock.is_coroutine)
-
-        mock = klass(is_coroutine=True)
-        self.assertTrue(mock.is_coroutine)
+@unittest.skip
+class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
+                                _Test_iscoroutinefunction,
+                                _Test_is_coroutine_property,
+                                _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+    class_to_test = 'NonCallableMagicMock'
 
 
 class Test_Mock(unittest.TestCase, _Test_subclass,
@@ -154,6 +164,39 @@ class Test_MagicMock(unittest.TestCase, _Test_subclass,
 class Test_CoroutineMock(unittest.TestCase, _Test_iscoroutinefunction,
                          _Test_called_coroutine):
     class_to_test = 'CoroutineMock'
+
+
+class TestMockInheritanceModel(unittest.TestCase):
+    to_test = {
+        'NonCallableMagicMock': 'NonCallableMock',
+        'Mock': 'NonCallableMock',
+        'MagicMock': 'Mock',
+        'CoroutineMock': 'Mock',
+    }
+
+    def test_Mock_is_not_CoroutineMock(self):
+        self.assertNotIsInstance(aiotest.mock.Mock(), aiotest.mock.CoroutineMock)
+
+    def test_MagicMock_is_not_CoroutineMock(self):
+        self.assertNotIsInstance(aiotest.mock.MagicMock(), aiotest.mock.CoroutineMock)
+
+    @staticmethod
+    def make_inheritance_test(child, parent):
+        def test(self):
+            # Works in the common case
+            self.assertIsInstance(getattr(aiotest.mock, child)(),
+                                  getattr(aiotest.mock, parent))
+
+            # Works with a custom spec
+            self.assertIsInstance(getattr(aiotest.mock, child)(Test()),
+                                  getattr(aiotest.mock, parent))
+
+        return test
+
+for child, parent in TestMockInheritanceModel.to_test.items():
+    setattr(TestMockInheritanceModel,
+            'test_{}_inherits_from_{}'.format(child, parent),
+            TestMockInheritanceModel.make_inheritance_test(child, parent))
 
 
 if __name__ == "__main__":

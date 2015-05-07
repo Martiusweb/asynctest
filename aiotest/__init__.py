@@ -5,7 +5,10 @@ import unittest
 from unittest import *
 
 # Shadows unittest with our enhanced classes
-from .case import TestCase, FunctionTestCase, ignore_loop
-from .mock import NonCallableMock, Mock, MagicMock, CoroutineMock
+from .case import *
+from .mock import *
+
+# And load or own tools
+from .helpers import *
 
 __all__ = unittest.__all__

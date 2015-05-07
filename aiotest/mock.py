@@ -10,11 +10,8 @@ Features currently supported:
 """
 
 import asyncio
+import types
 import unittest.mock
-
-from unittest.mock import *  # NOQA
-
-DEFAULT = unittest.mock.DEFAULT
 
 
 def _raise(exception):
@@ -48,6 +45,42 @@ def _get_child_mock(self, *args, _new_name=None, **kwargs):
         return klass(**kwargs)
 
 
+class FakeInheritance(type):
+    """
+    A metaclass which recreates the original inheritance model from
+    unittest.mock.
+
+    - NonCallableMock > NonCallableMagicMock
+    - NonCallable > Mock
+    - Mock > MagicMock
+    """
+    def __init__(self, name, bases, attrs):
+        attrs['__new__'] = types.MethodType(self.__new, self)
+        super().__init__(name, bases, attrs)
+
+    @staticmethod
+    def __new(cls, *args, **kwargs):
+        new = type(cls.__name__, (cls, ), {'__doc__': cls.__doc__})
+        return object.__new__(new)
+
+    def __instancecheck__(self, obj):
+        # That's tricky, each type(mock) is actually a subclass of the actual
+        # Mock type (see __new__)
+        if super().__instancecheck__(obj):
+            return True
+
+        _type = type(obj)
+        if issubclass(self, NonCallableMock):
+            if issubclass(_type, (NonCallableMagicMock, Mock, )):
+                return True
+
+        if issubclass(self, Mock) and not issubclass(self, CoroutineMock):
+            if issubclass(_type, (MagicMock, )):
+                return True
+
+        return False
+
+
 # Notes about unittest.mock:
 #  - MagicMock > Mock > NonCallableMock (where ">" means inherits from)
 #  - when a mock instance is created, a new class (type) is created
@@ -55,7 +88,7 @@ def _get_child_mock(self, *args, _new_name=None, **kwargs):
 #  - we *must* use magic or object's internals when we want to add our own
 #    properties, and often override __getattr__/__setattr__ which are used
 #    in unittest.mock.NonCallableMock.
-class NonCallableMock(unittest.mock.NonCallableMock):
+class NonCallableMock(unittest.mock.NonCallableMock, metaclass=FakeInheritance):
     """
     Enhance unittest.mock.NonCallableMock with features allowing to mock
     a coroutine function.
@@ -108,7 +141,43 @@ class NonCallableMock(unittest.mock.NonCallableMock):
         return _get_child_mock(self, *args, **kwargs)
 
 
-class Mock(unittest.mock.Mock):
+class NonCallableMagicMock(unittest.mock.NonCallableMagicMock):
+    """
+    A version of MagicMock that isn't callable.
+    """
+    # XXX Currently, I can't find a way to satisfy all the constraints I want
+    # without duplicating code...
+    def __init__(self, spec=None, wraps=None, name=None, spec_set=None,
+                 is_coroutine=None, parent=None, **kwargs):
+
+        super().__init__(spec=spec, wraps=wraps, name=name, spec_set=spec_set,
+                         parent=parent, **kwargs)
+
+        self.__set_is_coroutine(is_coroutine)
+
+    def __get_is_coroutine(self):
+        return self.__dict__['_mock_is_coroutine']
+
+    def __set_is_coroutine(self, value):
+        self.__dict__['_mock_is_coroutine'] = bool(value)
+
+    is_coroutine = property(__get_is_coroutine, __set_is_coroutine,
+                            "True if the object mocked is a coroutine")
+
+    def __setattr__(self, name, value):
+        if name == 'is_coroutine':
+            self.__set_is_coroutine(value)
+        else:
+            return super().__setattr__(name, value)
+
+    def _mock_add_spec(self, *args, **kwargs):
+        return _mock_add_spec(self, *args, **kwargs)
+
+    def _get_child_mock(self, *args, **kwargs):
+        return _get_child_mock(self, *args, **kwargs)
+
+
+class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
     """
     Enhance unittest.mock.Mock so it returns a CoroutineMock object instead of
     a Mock object where a method on a spec or spec_set object is a coroutine.
