@@ -285,3 +285,94 @@ class CoroutineMock(Mock):
             return asyncio.coroutine(_raise)(e)
         except BaseException as e:
             return asyncio.coroutine(_raise)(e)
+
+
+def mock_open(mock=None, read_data=''):
+    """
+    A helper function to create a mock to replace the use of open(). It works
+    for open() called directly or used as a context manager.
+
+    Arguments:
+        mock: mock object to configure, by default an aiotest.MagicMock is
+        created with the API limited to methods or attributes available on
+        standard file handles.
+
+        read_data: string for the read() and readlines() of the file handle to
+        return. This is an empty string by default.
+    """
+    if mock is None:
+        mock = MagicMock(name='open', spec=open)
+
+    return unittest.mock.mock_open(mock, read_data)
+
+
+ANY = unittest.mock.ANY
+DEFAULT = unittest.mock.sentinel.DEFAULT
+
+
+def _update_new_callable(patcher, new, new_callable):
+    if new == DEFAULT and not new_callable:
+        if asyncio.iscoroutinefunction(patcher.get_original()[0]):
+            patcher.new_callable = CoroutineMock
+        else:
+            patcher.new_callable = MagicMock
+
+    return patcher
+
+
+def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
+          autospec=None, new_callable=None, **kwargs):
+    """
+    A context manager, function decorator or class decorator which patch the
+    target with the value given by ther new argument.
+
+    If new isn't provided, the default is an aiotest.CoroutineMock if the
+    patched object is a coroutine, or an aiotest.MagicMock object.
+
+    It is a replacement to unittest.mock.patch, but using aiotest.Mock objects.
+
+    see unittest.mock.patch().
+    """
+    patcher = unittest.mock.patch(target, new, spec, create, spec_set,
+                                  autospec, new_callable, **kwargs)
+
+    return _update_new_callable(patcher, new, new_callable)
+
+
+def _patch_object(target, attribute, new=DEFAULT, spec=None, create=False,
+                  spec_set=None, autospec=None, new_callable=None, **kwargs):
+
+    patcher = unittest.mock.patch.object(target, attribute, new, spec, create,
+                                         spec_set, autospec, new_callable,
+                                         **kwargs)
+
+    return _update_new_callable(patcher, new, new_callable)
+
+
+def _patch_multiple(target, spec=None, create=False, spec_set=None,
+                    autospec=None, new_callable=None, **kwargs):
+    patcher = unittest.mock.patch.multiple(target, spec, create, spec_set,
+                                           autospec, new_callable, **kwargs)
+
+    def _update(patcher):
+        return _update_new_callable(patcher, patcher.new, new_callable)
+
+    patcher = _update(patcher)
+    patcher.additional_patchers = list(map(_update,
+                                           patcher.additional_patchers))
+
+    return patcher
+
+
+patch.object = _patch_object
+patch.dict = unittest.mock._patch_dict
+patch.multiple = _patch_multiple
+patch.stopall = unittest.mock._patch_stopall
+patch.TEST_PREFIX = unittest.mock.patch.TEST_PREFIX
+
+
+sentinel = unittest.mock.sentinel
+call = unittest.mock.call
+create_autospec = unittest.mock.create_autospec
+# TODO create_autospec: call the original method and recreate the object
+PropertyMock = unittest.mock.PropertyMock

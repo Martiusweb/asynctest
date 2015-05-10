@@ -199,5 +199,55 @@ for child, parent in TestMockInheritanceModel.to_test.items():
             TestMockInheritanceModel.make_inheritance_test(child, parent))
 
 
+class Test_mock_open(unittest.TestCase):
+    def test_MagicMock_returned_by_default(self):
+        self.assertIsInstance(aiotest.mock_open(), aiotest.MagicMock)
+
+
+class Test_patch(unittest.TestCase):
+    def test_patch_with_MagicMock(self):
+        with aiotest.mock.patch('test.test_mock.Test') as mock:
+            self.assertIsInstance(mock, aiotest.mock.MagicMock)
+
+        with aiotest.mock.patch('test.test_mock.Test.a_function') as mock:
+            self.assertIsInstance(mock, aiotest.mock.MagicMock)
+
+    def test_patch_coroutine_function_with_CoroutineMock(self):
+        with aiotest.mock.patch('test.test_mock.Test.a_coroutine') as mock:
+            self.assertIsInstance(mock, aiotest.mock.CoroutineMock)
+
+
+class Test_patch_object(unittest.TestCase):
+    def test_patch_with_MagicMock(self):
+        with aiotest.mock.patch.object(Test(), 'a_function') as mock:
+            self.assertIsInstance(mock, aiotest.mock.MagicMock)
+
+        obj = Test()
+        obj.test = Test()
+        with aiotest.mock.patch.object(obj, 'test') as mock:
+            self.assertIsInstance(mock, aiotest.mock.MagicMock)
+
+    def test_patch_coroutine_function_with_CoroutineMock(self):
+        with aiotest.mock.patch.object(Test(), 'a_coroutine') as mock:
+            self.assertIsInstance(mock, aiotest.mock.CoroutineMock)
+
+
+class Test_patch_multiple(unittest.TestCase):
+    def test_patch_with_MagicMock(self):
+        default = aiotest.mock.DEFAULT
+        with aiotest.mock.patch.multiple('test.test_mock', Test=default):
+            import test.test_mock
+            self.assertIsInstance(test.test_mock.Test, aiotest.mock.MagicMock)
+
+    def test_patch_coroutine_function_with_CoroutineMock(self):
+        default = aiotest.mock.DEFAULT
+        with aiotest.mock.patch.multiple('test.test_mock.Test',
+                                         a_function=default,
+                                         a_coroutine=default):
+            import test.test_mock
+            obj = test.test_mock.Test()
+            self.assertIsInstance(obj.a_function, aiotest.mock.MagicMock)
+            self.assertIsInstance(obj.a_coroutine, aiotest.mock.CoroutineMock)
+
 if __name__ == "__main__":
     unittest.main()

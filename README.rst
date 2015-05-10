@@ -33,7 +33,12 @@ Mock and CoroutineMock
 
   - NonCallableMock, Mock and CoroutineMock can return CoroutineMock objects
     when its attributes are get if there is a matching attribute in the spec
-    (or spec_set) object which is a coroutine function.
+    (or spec_set) object which is a coroutine function,
+
+  - patch(), patch.object(), patch.multiple() return a MagickMock or
+    CoroutineMock object by default, according to the patched target,
+
+  - mock_open() returns a MagickMock object by default.
 
 
 Tests
