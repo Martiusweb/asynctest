@@ -41,6 +41,14 @@ Mock and CoroutineMock
   - mock_open() returns a MagickMock object by default.
 
 
+Helpers
+~~~~~~~
+
+  - the coroutine exhaust_callbacks(loop) returns once all the callbacks which
+    should be called immediatly are executed, which is useful when the test
+    author needs to assert things which are not yet executed by the loop.
+
+
 Tests
 -----
 
