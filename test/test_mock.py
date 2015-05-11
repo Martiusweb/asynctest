@@ -23,6 +23,11 @@ class Test:
     def a_function(self):
         pass
 
+    def is_patched(self):
+        return False
+
+    a_dict = {'is_patched': False}
+
 
 def inject_class(obj):
     if isinstance(obj, type):
@@ -216,6 +221,23 @@ class Test_patch(unittest.TestCase):
         with aiotest.mock.patch('test.test_mock.Test.a_coroutine') as mock:
             self.assertIsInstance(mock, aiotest.mock.CoroutineMock)
 
+    def test_patch_decorates_coroutine(self):
+        @aiotest.mock.patch('test.test_mock.Test.is_patched', new=lambda self: True)
+        @asyncio.coroutine
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().is_patched()
+
+        self.assertTrue(dry_run_coroutine(a_coroutine()))
+
+    def test_patch_decorates_function(self):
+        @aiotest.mock.patch('test.test_mock.Test.is_patched', new=lambda self: True)
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().is_patched()
+
+        self.assertTrue(a_coroutine())
+
 
 class Test_patch_object(unittest.TestCase):
     def test_patch_with_MagicMock(self):
@@ -230,6 +252,16 @@ class Test_patch_object(unittest.TestCase):
     def test_patch_coroutine_function_with_CoroutineMock(self):
         with aiotest.mock.patch.object(Test(), 'a_coroutine') as mock:
             self.assertIsInstance(mock, aiotest.mock.CoroutineMock)
+
+    def test_patch_decorates_coroutine(self):
+        obj = Test()
+
+        @aiotest.mock.patch.object(obj, 'is_patched', new=lambda: True)
+        @asyncio.coroutine
+        def a_coroutine():
+            return obj.is_patched()
+
+        self.assertTrue(dry_run_coroutine(a_coroutine()))
 
 
 class Test_patch_multiple(unittest.TestCase):
@@ -248,6 +280,35 @@ class Test_patch_multiple(unittest.TestCase):
             obj = test.test_mock.Test()
             self.assertIsInstance(obj.a_function, aiotest.mock.MagicMock)
             self.assertIsInstance(obj.a_coroutine, aiotest.mock.CoroutineMock)
+
+    def test_patch_decorates_coroutine(self):
+        @aiotest.mock.patch.multiple('test.test_mock.Test', is_patched=lambda self: True)
+        @asyncio.coroutine
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().is_patched()
+
+        self.assertTrue(dry_run_coroutine(a_coroutine()))
+
+
+class Test_patch_dict(unittest.TestCase):
+    def test_patch_decorates_coroutine(self):
+        @aiotest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        @asyncio.coroutine
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().a_dict['is_patched']
+
+        self.assertTrue(dry_run_coroutine(a_coroutine()))
+
+    def test_patch_decorates_function(self):
+        @aiotest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().a_dict['is_patched']
+
+        self.assertTrue(a_coroutine())
+
 
 if __name__ == "__main__":
     unittest.main()

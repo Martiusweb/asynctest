@@ -6,6 +6,8 @@ The package aiotest is built on top of the standard unittest module and brings
 features which ease and cut boilerplate code when testing libraries for
 asyncio.
 
+Currently, aiotest only supports Python 3.4.
+
 Author & license
 -------
 
@@ -37,6 +39,8 @@ Mock and CoroutineMock
 
   - patch(), patch.object(), patch.multiple() return a MagickMock or
     CoroutineMock object by default, according to the patched target,
+
+  - all the patch() methods can decorate coroutine functions,
 
   - mock_open() returns a MagickMock object by default.
 

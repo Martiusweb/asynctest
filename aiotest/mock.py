@@ -10,6 +10,8 @@ Features currently supported:
 """
 
 import asyncio
+import functools
+import sys
 import types
 import unittest.mock
 
@@ -320,6 +322,61 @@ def _update_new_callable(patcher, new, new_callable):
     return patcher
 
 
+class _patch(unittest.mock._patch):
+    def copy(self):
+        patcher = _patch(
+            self.getter, self.attribute, self.new, self.spec,
+            self.create, self.spec_set,
+            self.autospec, self.new_callable, self.kwargs
+        )
+        patcher.attribute_name = self.attribute_name
+        patcher.additional_patchers = [
+            p.copy() for p in self.additional_patchers
+        ]
+        return patcher
+
+    def decorate_callable(self, func):
+        if hasattr(func, 'patchings'):
+            func.patchings.append(self)
+            return func
+
+        if not asyncio.iscoroutinefunction(func):
+            return super().decorate_callable(func)
+
+        @functools.wraps(func)
+        def patched(*args, **keywargs):
+            extra_args = []
+            entered_patchers = []
+
+            exc_info = tuple()
+            try:
+                for patching in patched.patchings:
+                    arg = patching.__enter__()
+                    entered_patchers.append(patching)
+                    if patching.attribute_name is not None:
+                        keywargs.update(arg)
+                    elif patching.new is DEFAULT:
+                        extra_args.append(arg)
+
+                args += tuple(extra_args)
+                return (yield from func(*args, **keywargs))
+            except:
+                if patching not in entered_patchers and unittest.mock._is_started(patching):
+                    # the patcher may have been started, but an exception
+                    # raised whilst entering one of its additional_patchers
+                    entered_patchers.append(patching)
+                # Pass the exception to __exit__
+                exc_info = sys.exc_info()
+                # re-raise the exception
+                raise
+            finally:
+                for patching in reversed(entered_patchers):
+                    patching.__exit__(*exc_info)
+
+        patched.patchings = [self]
+        return patched
+
+
 def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
           autospec=None, new_callable=None, **kwargs):
     """
@@ -333,26 +390,46 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     see unittest.mock.patch().
     """
-    patcher = unittest.mock.patch(target, new, spec, create, spec_set,
-                                  autospec, new_callable, **kwargs)
+
+    getter, attribute = unittest.mock._get_target(target)
+    patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
+                     new_callable, kwargs)
 
     return _update_new_callable(patcher, new, new_callable)
 
 
 def _patch_object(target, attribute, new=DEFAULT, spec=None, create=False,
                   spec_set=None, autospec=None, new_callable=None, **kwargs):
-
-    patcher = unittest.mock.patch.object(target, attribute, new, spec, create,
-                                         spec_set, autospec, new_callable,
-                                         **kwargs)
+    patcher = _patch(lambda: target, attribute, new, spec, create, spec_set,
+                     autospec, new_callable, kwargs)
 
     return _update_new_callable(patcher, new, new_callable)
 
 
 def _patch_multiple(target, spec=None, create=False, spec_set=None,
                     autospec=None, new_callable=None, **kwargs):
-    patcher = unittest.mock.patch.multiple(target, spec, create, spec_set,
-                                           autospec, new_callable, **kwargs)
+    if type(target) is str:
+        def getter():
+            return unittest.mock._importer(target)
+    else:
+        def getter():
+            return target
+
+    if not kwargs:
+        raise ValueError('Must supply at least one keyword argument with '
+                         'patch.multiple')
+
+    items = list(kwargs.items())
+    attribute, new = items[0]
+    patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
+                     new_callable, {})
+
+    patcher.attribute_name = attribute
+    for attribute, new in items[1:]:
+        this_patcher = _patch(getter, attribute, new, spec, create, spec_set,
+                              autospec, new_callable, {})
+        this_patcher.attribute_name = attribute
+        patcher.additional_patchers.append(this_patcher)
 
     def _update(patcher):
         return _update_new_callable(patcher, patcher.new, new_callable)
@@ -364,8 +441,24 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
     return patcher
 
 
+class _patch_dict(unittest.mock._patch_dict):
+    def __call__(self, f):
+        if not asyncio.iscoroutinefunction(f):
+            return super().__call__(f)
+
+        @functools.wraps(f)
+        def _inner(*args, **kw):
+            self._patch_dict()
+            try:
+                return (yield from f(*args, **kw))
+            finally:
+                self._unpatch_dict()
+
+        return _inner
+
+
 patch.object = _patch_object
-patch.dict = unittest.mock._patch_dict
+patch.dict = _patch_dict
 patch.multiple = _patch_multiple
 patch.stopall = unittest.mock._patch_stopall
 patch.TEST_PREFIX = unittest.mock.patch.TEST_PREFIX
