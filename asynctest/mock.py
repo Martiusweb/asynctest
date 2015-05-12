@@ -194,11 +194,11 @@ class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
     ...     def bar(self):
     ...         pass
 
-    >>> type(aiotest.mock.Mock(Foo()).foo)
-    <class 'aiotest.mock.CoroutineMock'>
+    >>> type(asynctest.mock.Mock(Foo()).foo)
+    <class 'asynctest.mock.CoroutineMock'>
 
-    >>> type(aiotest.mock.Mock(Foo()).bar)
-    <class 'aiotest.mock.Mock'>
+    >>> type(asynctest.mock.Mock(Foo()).bar)
+    <class 'asynctest.mock.Mock'>
 
     The test author can also specify a wrapped object (the the wraps argument
     of the constructor). In this case, the Mock object behavior is the same as
@@ -229,7 +229,7 @@ class MagicMock(unittest.mock.MagicMock):
 
 class CoroutineMock(Mock):
     """
-    Enhance aiotest.mock.Mock with features allowing to mock a coroutine
+    Enhance asynctest.mock.Mock with features allowing to mock a coroutine
     function.
 
     The Mock object will behave so:
@@ -295,7 +295,7 @@ def mock_open(mock=None, read_data=''):
     for open() called directly or used as a context manager.
 
     Arguments:
-        mock: mock object to configure, by default an aiotest.MagicMock is
+        mock: mock object to configure, by default an asynctest.MagicMock is
         created with the API limited to methods or attributes available on
         standard file handles.
 
@@ -383,10 +383,11 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     A context manager, function decorator or class decorator which patch the
     target with the value given by ther new argument.
 
-    If new isn't provided, the default is an aiotest.CoroutineMock if the
-    patched object is a coroutine, or an aiotest.MagicMock object.
+    If new isn't provided, the default is an asynctest.CoroutineMock if the
+    patched object is a coroutine, or an asynctest.MagicMock object.
 
-    It is a replacement to unittest.mock.patch, but using aiotest.Mock objects.
+    It is a replacement to unittest.mock.patch, but using asynctest.Mock
+    objects.
 
     see unittest.mock.patch().
     """

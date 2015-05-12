@@ -1,12 +1,11 @@
 =======
-aiotest
+asynctest
 =======
 
-The package aiotest is built on top of the standard unittest module and brings
-features which ease and cut boilerplate code when testing libraries for
-asyncio.
+The package asynctest is built on top of the standard unittest module and
+cuts boilerplate code when testing libraries for asyncio.
 
-Currently, aiotest only supports Python 3.4.
+Currently, asynctest only supports Python 3.4.
 
 Author & license
 -------

@@ -51,7 +51,7 @@ class TestCase(unittest.case.TestCase):
         self.loop = None
 
     def _patch_loop(self, loop):
-        loop.__aiotest_ran = False
+        loop.__asynctest_ran = False
 
         def wraps(method):
             @functools.wraps(method)
@@ -59,7 +59,7 @@ class TestCase(unittest.case.TestCase):
                 try:
                     return method(*args, **kwargs)
                 finally:
-                    loop.__aiotest_ran = True
+                    loop.__asynctest_ran = True
 
             return types.MethodType(wrapper, loop)
 
@@ -177,11 +177,11 @@ class TestCase(unittest.case.TestCase):
             self.loop.run_until_complete(result)
             return
 
-        if (getattr(self.__class__, "__aiotest_ignore_loop__", False) or
-                getattr(method, "__aiotest_ignore_loop__", False)):
+        if (getattr(self.__class__, "__asynctest_ignore_loop__", False) or
+                getattr(method, "__asynctest_ignore_loop__", False)):
             return
 
-        if not self.loop.__aiotest_ran:
+        if not self.loop.__asynctest_ran:
             self.fail("Loop did not run during the test")
 
 
@@ -195,5 +195,5 @@ def ignore_loop(test):
     """
     Ignore the error case where the loop did not run during the test.
     """
-    test.__aiotest_ignore_loop__ = True
+    test.__asynctest_ignore_loop__ = True
     return test

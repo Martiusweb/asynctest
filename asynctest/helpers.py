@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-Helper functions and coroutines for aiotest.
+Helper functions and coroutines for asynctest.
 """
 
 import asyncio

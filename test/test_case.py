@@ -5,19 +5,19 @@ import itertools
 import unittest
 import unittest.mock
 
-import aiotest
+import asynctest
 
 
 class Test:
-    class FooTestCase(aiotest.TestCase):
+    class FooTestCase(asynctest.TestCase):
         def runTest(self):
             pass
 
         def test_foo(self):
             pass
 
-    @aiotest.ignore_loop
-    class LoggingTestCase(aiotest.TestCase):
+    @asynctest.ignore_loop
+    class LoggingTestCase(asynctest.TestCase):
         def __init__(self, calls):
             super().__init__()
             self.calls = calls
@@ -36,8 +36,8 @@ class Test_TestCase(unittest.TestCase):
     run_methods = ('run', 'debug', )
 
     def test_init_and_close_loop_for_test(self):
-        @aiotest.ignore_loop
-        class LoopTest(aiotest.TestCase):
+        @asynctest.ignore_loop
+        class LoopTest(asynctest.TestCase):
             failing = False
 
             def runTest(self):
@@ -69,7 +69,7 @@ class Test_TestCase(unittest.TestCase):
                 self.assertFalse(case.failing)
 
     def test_coroutinefunction_executed(self):
-        class CoroutineFunctionTest(aiotest.TestCase):
+        class CoroutineFunctionTest(asynctest.TestCase):
             ran = False
 
             @asyncio.coroutine
@@ -84,7 +84,7 @@ class Test_TestCase(unittest.TestCase):
                 self.assertTrue(case.ran)
 
     def test_coroutine_returned_executed(self):
-        class CoroutineTest(aiotest.TestCase):
+        class CoroutineTest(asynctest.TestCase):
             ran = False
 
             def runTest(self):
@@ -104,21 +104,21 @@ class Test_TestCase(unittest.TestCase):
         self.assertEqual(1, len(result.failures))
 
     def test_passes_when_ignore_loop_or_loop_run(self):
-        @aiotest.ignore_loop
+        @asynctest.ignore_loop
         class IgnoreLoopClassTest(Test.FooTestCase):
             pass
 
-        class IgnoreLoopMethodTest(aiotest.TestCase):
-            @aiotest.ignore_loop
+        class IgnoreLoopMethodTest(asynctest.TestCase):
+            @asynctest.ignore_loop
             def runTest(self):
                 pass
 
-        class WithCoroutineTest(aiotest.TestCase):
+        class WithCoroutineTest(asynctest.TestCase):
             @asyncio.coroutine
             def runTest(self):
                 yield from []
 
-        class WithFunctionCallingLoopTest(aiotest.TestCase):
+        class WithFunctionCallingLoopTest(asynctest.TestCase):
             def runTest(self):
                 fut = asyncio.Future()
                 self.loop.call_soon(fut.set_result, None)
@@ -133,14 +133,14 @@ class Test_TestCase(unittest.TestCase):
                 self.assertEqual(0, len(result.failures))
 
     def test_setup_teardown_may_be_coroutines(self):
-        @aiotest.ignore_loop
+        @asynctest.ignore_loop
         class WithSetupFunction(Test.FooTestCase):
             ran = False
 
             def setUp(self):
                 WithSetupFunction.ran = True
 
-        @aiotest.ignore_loop
+        @asynctest.ignore_loop
         class WithSetupCoroutine(Test.FooTestCase):
             ran = False
 
@@ -148,14 +148,14 @@ class Test_TestCase(unittest.TestCase):
             def setUp(self):
                 WithSetupCoroutine.ran = True
 
-        @aiotest.ignore_loop
+        @asynctest.ignore_loop
         class WithTearDownFunction(Test.FooTestCase):
             ran = False
 
             def tearDown(self):
                 WithTearDownFunction.ran = True
 
-        @aiotest.ignore_loop
+        @asynctest.ignore_loop
         class WithTearDownCoroutine(Test.FooTestCase):
             ran = False
 
