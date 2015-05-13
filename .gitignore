@@ -1,3 +1,5 @@
 *.py[oc]
 __pycache__
 build
+asynctest.egg-info
+dist
