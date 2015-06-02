@@ -1,6 +1,6 @@
-=======
+=========
 asynctest
-=======
+=========
 
 The package asynctest is built on top of the standard unittest module and
 cuts boilerplate code when testing libraries for asyncio.
@@ -8,10 +8,15 @@ cuts boilerplate code when testing libraries for asyncio.
 Currently, asynctest only supports Python 3.4.
 
 Author & license
--------
+----------------
 
 Authored by Martin Richard <martius@martiusweb.net> and licensed under the
 Apache 2 license.
+
+Documentation
+-------------
+
+Full documentation is available at http://asynctest.readthedocs.org/en/latest/
 
 Features
 --------

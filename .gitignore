@@ -3,3 +3,4 @@ __pycache__
 build
 asynctest.egg-info
 dist
+doc/_build
