@@ -10,5 +10,6 @@ from .mock import *
 
 # And load or own tools
 from .helpers import *
+from .selector import *
 
 __all__ = unittest.__all__

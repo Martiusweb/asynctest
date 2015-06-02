@@ -44,6 +44,23 @@ Mock and CoroutineMock
   - mock_open() returns a MagickMock object by default.
 
 
+Selectors
+~~~~~~~
+
+The module asynctest.selector provides classes to mock objects performing IO
+(files, sockets, etc).
+
+  - FileMock is a special type of mock which represents a file.
+    FileMock.fileno() returns a special value which allows to identify uniquely
+    the mock,
+
+  - SocketMock is a special type of FileMock which uses socket.socket as spec,
+
+  - TestSelector is a custom selector able to wrap a real selector
+    implementation and deal with FileMock objects, it can replace a selector
+    loop by calling `loop._selector = TestSelector(loop._selector)`, and will
+    intercept mock so they don't get registered to the actual selector.
+
 Helpers
 ~~~~~~~
 
