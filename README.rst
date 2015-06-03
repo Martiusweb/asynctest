@@ -19,7 +19,9 @@ Features
 TestCase and FunctionTestCase
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  - Initialize and close a loop created for each test,
+  - Initialize and close a loop created for each test, if the loop uses
+    a selector, it will be updated with a TestSelector object wrapping the
+    original selector (see below),
   - if the test function is a coroutine function or returns a coroutine, it
     will run on the loop,
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
@@ -45,7 +47,7 @@ Mock and CoroutineMock
 
 
 Selectors
-~~~~~~~
+~~~~~~~~~
 
 The module asynctest.selector provides classes to mock objects performing IO
 (files, sockets, etc).

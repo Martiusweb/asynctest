@@ -172,6 +172,25 @@ class Test_TestCase(unittest.TestCase):
                     getattr(case, method)()
                     self.assertTrue(case.ran)
 
+    def test_loop_uses_TestSelector(self):
+        @asynctest.ignore_loop
+        class CheckLoopTest(asynctest.TestCase):
+            def runTest(self):
+                # TestSelector is used
+                self.assertIsInstance(self.loop._selector,
+                                      asynctest.selector.TestSelector)
+
+                # And wraps the original selector
+                self.assertIsNotNone(self.loop._selector._selector)
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = CheckLoopTest()
+                outcome = getattr(case, method)()
+
+                if outcome:
+                    self.assertTrue(outcome.wasSuccessful())
+
 
 if __name__ == "__main__":
     unittest.main()

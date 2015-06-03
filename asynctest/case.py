@@ -22,6 +22,8 @@ import unittest.case
 
 from unittest.case import *  # NOQA
 
+import asynctest.selector
+
 
 class TestCase(unittest.case.TestCase):
     """
@@ -65,6 +67,9 @@ class TestCase(unittest.case.TestCase):
 
         for method in ('run_forever', 'run_until_complete', ):
             setattr(loop, method, wraps(getattr(loop, method)))
+
+        if isinstance(loop, asyncio.selector_events.BaseSelectorEventLoop):
+            loop._selector = asynctest.selector.TestSelector(loop._selector)
 
         return loop
 
