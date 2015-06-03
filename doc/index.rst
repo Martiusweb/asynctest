@@ -1,22 +1,29 @@
-.. asynctest documentation master file, created by
-   sphinx-quickstart on Tue Jun  2 12:56:20 2015.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+.. asynctest documentation master file
 
 asynctest documentation
 =======================
 
-Contents:
+.. automodule:: asynctest
 
 .. toctree::
    :maxdepth: 2
 
+   asynctest.case
+   asynctest.mock
+   asynctest.selector
+   asynctest.helpers
 
 
-Indices and tables
-==================
+Contribute
+----------
+
+Development of :mod:`asynctest` is on github:
+`Martiusweb/asynctest <https://www.github.com/Martiusweb/asynctest>`_.
+Patches, feature requests and bug reports are welcome.
+
+Documentation indices and tables
+--------------------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
-

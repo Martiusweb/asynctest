@@ -1,12 +1,12 @@
 # coding: utf-8
 """
+Mock objects
+------------
+
 Wrapper to unittest.mock reducing the boilerplate when testing asyncio powered
 code.
 
-Features currently supported:
-
-  * A mock can behave as a coroutine, as specified in the documentation of
-    Mock.
+A mock can behave as a coroutine, as specified in the documentation of Mock.
 """
 
 import asyncio
@@ -92,24 +92,27 @@ class FakeInheritance(type):
 #    in unittest.mock.NonCallableMock.
 class NonCallableMock(unittest.mock.NonCallableMock, metaclass=FakeInheritance):
     """
-    Enhance unittest.mock.NonCallableMock with features allowing to mock
-    a coroutine function.
+    Enhance :class:`unittest.mock.NonCallableMock` with features allowing to
+    mock a coroutine function.
 
-    If is_coroutine is set to True, the NonCallableMock object will behave so
-    asyncio.iscoroutinefunction(mock) will return True.
+    If ``is_coroutine`` is set to ``True``, the :class:`NonCallableMock`
+    object will behave so :func:`asyncio.iscoroutinefunction` will return
+    ``True`` with ``mock`` as parameter.
 
-    If spec or spec_set is defined and an attribute is get, CoroutineMock is
-    returned instead of Mock when the matching spec attribute is a coroutine
+    If ``spec`` or ``spec_set`` is defined and an attribute is get,
+    :class:`~asynctest.CoroutineMock` is returned instead of
+    :class:`~asynctest.Mock` when the matching spec attribute is a coroutine
     function.
 
-    The test author can also specify a wrapped object (the the wraps argument
-    of the constructor). In this case, the Mock object behavior is the same as
-    with an unittest.mock.Mock object: the wrapped object may have methods
+    The test author can also specify a wrapped object with ``wraps``. In this
+    case, the :class:`~asynctest.Mock` object behavior is the same as with an
+    :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
+
+    See :class:`unittest.mock.NonCallableMock`
     """
     def __init__(self, spec=None, wraps=None, name=None, spec_set=None,
                  is_coroutine=None, parent=None, **kwargs):
-
         super().__init__(spec=spec, wraps=wraps, name=name, spec_set=spec_set,
                          parent=parent, **kwargs)
 
@@ -145,7 +148,7 @@ class NonCallableMock(unittest.mock.NonCallableMock, metaclass=FakeInheritance):
 
 class NonCallableMagicMock(unittest.mock.NonCallableMagicMock):
     """
-    A version of MagicMock that isn't callable.
+    A version of :class:`~asynctst.MagicMock` that isn't callable.
     """
     # XXX Currently, I can't find a way to satisfy all the constraints I want
     # without duplicating code...
@@ -181,8 +184,10 @@ class NonCallableMagicMock(unittest.mock.NonCallableMagicMock):
 
 class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
     """
-    Enhance unittest.mock.Mock so it returns a CoroutineMock object instead of
-    a Mock object where a method on a spec or spec_set object is a coroutine.
+    Enhance :class:`unittest.mock.Mock` so it returns
+    a class:`~asynctest.CoroutineMock` object instead of
+    a :class:`~asynctest.Mock` object where a method on a ``spec`` or
+    ``spec_set`` object is a coroutine.
 
     For instance:
 
@@ -200,10 +205,14 @@ class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
     >>> type(asynctest.mock.Mock(Foo()).bar)
     <class 'asynctest.mock.Mock'>
 
-    The test author can also specify a wrapped object (the the wraps argument
-    of the constructor). In this case, the Mock object behavior is the same as
-    with an unittest.mock.Mock object: the wrapped object may have methods
+    The test author can also specify a wrapped object with ``wraps``. In this
+    case, the :class:`~asynctest.Mock` object behavior is the same as with an
+    :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
+
+    See :class:`~asynctest.NonCallableMock` for details about :mod:`asynctest`
+    features, and :mod:`unittest.mock` for the comprehensive documentation
+    about mocking.
     """
     def _mock_add_spec(self, *args, **kwargs):
         return _mock_add_spec(self, *args, **kwargs)
@@ -214,11 +223,12 @@ class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
 
 class MagicMock(unittest.mock.MagicMock):
     """
-    Enhance unittest.mock.MagicMock so it returns a CoroutineMock object
-    instead of a Mock object where a method on a spec or spec_set object is
-    a coroutine.
+    Enhance :class:`unittest.mock.MagicMock` so it returns
+    a :class:`~asynctest.CoroutineMock` object instead of
+    a class:`~asynctest.Mock` object where a method on a ``spec`` or
+    ``spec_set`` object is a coroutine.
 
-    see Mock.
+    see :class:`~asynctest.Mock`.
     """
     def _mock_add_spec(self, *args, **kwargs):
         return _mock_add_spec(self, *args, **kwargs)
@@ -229,39 +239,40 @@ class MagicMock(unittest.mock.MagicMock):
 
 class CoroutineMock(Mock):
     """
-    Enhance asynctest.mock.Mock with features allowing to mock a coroutine
-    function.
+    Enhance :class:`~asynctest.mock.Mock` with features allowing to mock
+    a coroutine function.
 
-    The Mock object will behave so:
+    The :class:`~asynctest.CoroutineMock` object will behave so the object is
+    recognized as coroutine function, and the result of a call as a coroutine:
 
-      * asyncio.iscoroutinefunction(mock) will return True,
+    >>> mock = CoroutineMock()
+    >>> asyncio.iscoroutinefunction(mock)
+    True
+    >>> asyncio.iscoroutine(mock())
+    True
 
-      * asyncio.iscoroutine(mock()) will return True,
 
-      * the result of mock() is a coroutine which will have the outcome of
-        side_effect or return_value:
+    The result of ``mock()`` is a coroutine which will have the outcome of
+    ``side_effect`` or ``return_value``:
 
-          - if side_effect is a function, the coroutine will return the result
-            of that function,
+    - if ``side_effect`` is a function, the coroutine will return the result
+      of that function,
+    - if ``side_effect`` is an exception, the coroutine will raise the
+      exception,
+    - if`` side_effect`` is an iterable, the coroutine will return the next
+      value of the iterable, however, if the sequence of result is exhausted,
+      ``StopIteration`` is raised immediatly,
+    - if ``side_effect`` is not defined, the coroutine will return the value
+      defined by ``return_value``, hence, by default, the coroutine returns
+      a new :class:`~asynctest.CoroutineMock` object.
 
-          - if side_effect is an exception, the coroutine will raise the
-            exception,
+    If the outcome of ``side_effect`` or ``return_vaule`` is a coroutine, the
+    mock coroutine obtained when the mock object is called will be this
+    coroutine itself (and not a coroutine returning a coroutine).
 
-          - if side_effect is an iterable, the coroutine will return the next
-            value of the iterable, however, if the sequence of result is
-            exhausted, StopIteration is raised immediatly,
-
-          - if side_effect is not defined, the coroutine will return the value
-            defined by return_value, hence, by default, the coroutine returns
-            a new CoroutineMock object.
-
-      * if the outcome of side_effect or return_vaule is a coroutine, the mock
-      coroutine obtained when the mock object is called will be this coroutine
-      itself (and not a coroutine returning a coroutine).
-
-    The test author can also specify a wrapped object (the the wraps argument
-    of the constructor). In this case, the Mock object behavior is the same as
-    with an unittest.mock.Mock object: the wrapped object may have methods
+    The test author can also specify a wrapped object with ``wraps``. In this
+    case, the :class:`~asynctest.Mock` object behavior is the same as with an
+    :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
     """
     def __init__(self, *args, **kwargs):
@@ -291,16 +302,17 @@ class CoroutineMock(Mock):
 
 def mock_open(mock=None, read_data=''):
     """
-    A helper function to create a mock to replace the use of open(). It works
-    for open() called directly or used as a context manager.
+    A helper function to create a mock to replace the use of :func:`open()`. It
+    works for :func:`open()` called directly or used as a context manager.
 
-    Arguments:
-        mock: mock object to configure, by default an asynctest.MagicMock is
-        created with the API limited to methods or attributes available on
-        standard file handles.
+    :param mock: mock object to configure, by default
+                 a :class:`~asynctest.MagicMock` object is
+                 created with the API limited to methods or attributes
+                 available on standard file handles.
 
-        read_data: string for the read() and readlines() of the file handle to
-        return. This is an empty string by default.
+    :param read_data: string for the :func:`read()` and :func:`readlines()` of
+                      the file handle to return. This is an empty string by
+                      default.
     """
     if mock is None:
         mock = MagicMock(name='open', spec=open)
@@ -383,13 +395,14 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     A context manager, function decorator or class decorator which patch the
     target with the value given by ther new argument.
 
-    If new isn't provided, the default is an asynctest.CoroutineMock if the
-    patched object is a coroutine, or an asynctest.MagicMock object.
+    If new isn't provided, the default is a :class:`~asynctest.CoroutineMock`
+    if the patched object is a coroutine, or a :class:`~asynctest.MagicMock`
+    object.
 
-    It is a replacement to unittest.mock.patch, but using asynctest.Mock
-    objects.
+    It is a replacement to :func:`unittest.mock.patch`, but using
+    :module:`asynctest.mock` objects.
 
-    see unittest.mock.patch().
+    see :func:`unittest.mock.patch()`.
     """
 
     getter, attribute = unittest.mock._get_target(target)

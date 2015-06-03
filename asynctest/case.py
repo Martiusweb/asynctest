@@ -1,18 +1,23 @@
 # coding: utf-8
 """
-Wrapper to unittest reducing the boilerplate when testing asyncio powered code.
+Module asynctest.case
+---------------------
 
-Features currently supported:
+Enhance :class:`unittest.TestCase`:
 
-  * a new loop is issued and set as the default loop before each test, and
-    closed and disposed after,
+* a new loop is issued and set as the default loop before each test, and
+  closed and disposed after,
 
-  * a test method in a TestCase identified as a coroutine function or returning
-    a coroutine will run on the loop,
+* if the loop uses a selector, it will be wrapped with
+  :class:`asynctest.TestSelector`,
 
-  * setUp() and tearDown() methods can be coroutine functions,
+* a test method in a TestCase identified as a coroutine function or returning
+  a coroutine will run on the loop,
 
-  * a test fails if the loop did not run during the test.
+* :meth:`~TestCase.setUp()` and :meth:`~TestCase.tearDown()` methods can be
+  coroutine functions,
+
+* a test fails if the loop did not run during the test.
 """
 
 import asyncio
@@ -28,10 +33,10 @@ import asynctest.selector
 class TestCase(unittest.case.TestCase):
     """
     For each test, a new loop is created and is set as the default loop. Test
-    authors can retrieve this loop with the self.loop property.
+    authors can retrieve this loop with :attr:`~asynctest.TestCase.loop`.
 
-    if setUp() and tearDown() are coroutine functions, they will run on the
-    loop.
+    if :meth:`setUp()` and :meth:`tearDown()` are coroutine functions, they
+    will run on the loop.
 
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
@@ -40,8 +45,11 @@ class TestCase(unittest.case.TestCase):
     not is checked. This allows to detect cases where a test author assume its
     test will run tasks or callbacks on the loop, but it actually didn't. When
     the test author doesn't need this assertion to be verified, the test
-    function or TestCase class can be decorated with @ignore_loop.
+    function or :class:`~asynctest.TestCase` class can be decorated with
+    :func:`~asynctest.ignore_loop`.
+
     """
+    #: Event loop created and set as default event loop during the test.
     loop = None
 
     def _init_loop(self):
@@ -192,7 +200,8 @@ class TestCase(unittest.case.TestCase):
 
 class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
-    Enables the same features as TestCase, but for FunctionTestCase.
+    Enables the same features as :class:`~asynctest.TestCase`, but for
+    :class:`~asynctest.FunctionTestCase`.
     """
 
 

@@ -20,6 +20,7 @@ import os
 # Import asynctest source directory
 sys.path.insert(0, os.path.abspath('..'))  # NOQA
 
+
 from setup import args as setup_args
 
 # -- General configuration ------------------------------------------------
@@ -283,4 +284,4 @@ texinfo_documents = [(master_doc, project, project + ' Documentation',
 
 
 # Example configuration for intersphinx: refer to the Python standard library.
-intersphinx_mapping = {'https://docs.python.org/': None}
+intersphinx_mapping = {'https://docs.python.org/3': None}

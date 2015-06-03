@@ -1,11 +1,14 @@
 # coding: utf-8
 """
-Mock of selectors and compatible objects performing asynchronous IO.
+Mocking of Selector
+-------------------
+
+Mock of :mod:`selectors` and compatible objects performing asynchronous IO.
 
 This module provides classes to mock objects performing IO (files, sockets,
-etc). These mocks are compatible with TestSelector, which can simulate the
-behavior of a selector on the mock objects, or forward actual work to a real
-selector.
+etc). These mocks are compatible with :class:`~asynctest.TestSelector`, which
+can simulate the behavior of a selector on the mock objects, or forward actual
+work to a real selector.
 """
 
 import selectors
@@ -15,6 +18,16 @@ from . import mock
 
 
 class FileDescriptor(int):
+    """
+    A subclass of int which allows to identify the virtual file-descriptor of a
+    :class:`~asynctest.FileMock`.
+
+    If :class:`~asynctest.FileDescriptor()` without argument, its value will be
+    the value of :data:`~FileDescriptor.next_fd`.
+
+    When an object is created, :data:`~FileDescriptor.next_fd` is set to the
+    highest value for a :class:`~asynctest.FileDescriptor` object + 1.
+    """
     next_fd = 0
 
     def __new__(cls, *args, **kwargs):
@@ -35,10 +48,14 @@ class FileDescriptor(int):
 
 def fd(fileobj):
     """
-    Return the FileDescriptor value of fileobj.
+    Return the :class:`~asynctest.FileDescriptor` value of ``fileobj``.
 
-    If fileobj is a FileDescriptor, fileobj is returned, else fileobj.fileno()
-    is returned instead.
+    If ``fileobj`` is a :class:`~asynctest.FileDescriptor`, ``fileobj`` is
+    returned, else ``fileobj.fileno()``  is returned instead.
+
+    :raise ValueError: if filobj is not a :class:`~asynctest.FileMock`,
+                       a file-like object or
+                       a :class:`~asynctest.FileDescriptor`.
     """
     try:
         return fileobj if isinstance(fileobj, FileDescriptor) else fileobj.fileno()
@@ -48,7 +65,8 @@ def fd(fileobj):
 
 def isfilemock(obj):
     """
-    Return True if the obj or obj.fileno() is a FileDescriptor.
+    Return ``True`` if the ``obj`` or ``obj.fileno()`` is
+    a :class:`asynctest.FileDescriptor`.
     """
     try:
         return (isinstance(obj, FileDescriptor) or
@@ -64,6 +82,10 @@ class FileMock(mock.Mock):
 
     A FileMock is an intelligent mock which can work with TestSelector to
     simulate IO events during tests.
+
+    .. method:: fileno()
+
+        Return a :class:`~asynctest.FileDescriptor` object.
     """
     def __init__(self, *args, parent=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -78,6 +100,8 @@ class FileMock(mock.Mock):
 class SocketMock(FileMock):
     """
     Mock a socket.
+
+    See :class:`~asynctest.FileMock`.
     """
     def __init__(self, side_effect=None, return_value=mock.DEFAULT,
                  wraps=None, name=None, spec_set=None, parent=None,
@@ -93,13 +117,17 @@ class TestSelector(selectors._BaseSelectorImpl):
 
     It can wrap an actual implementation of a selector, so the selector will
     work both with mocks and real file-like objects.
+
+    A common use case is to patch the selector loop:
+
+    ::
+
+        loop._selector = asynctest.TestSelector(loop._selector)
+
+    :param selector: optional, if provided, this selector will be used to work
+                     with real file-like objects.
     """
     def __init__(self, selector=None):
-        """
-        Args:
-            selector: optional, if provided, this selector will be used to work
-            with real file-like objects.
-        """
         super().__init__()
         self._selector = selector
 
@@ -111,13 +139,15 @@ class TestSelector(selectors._BaseSelectorImpl):
 
     def register(self, fileobj, events, data=None):
         """
-        Register a file object or a FileMock.
+        Register a file object or a :class:`~asynctest.FileMock`.
 
-        If a real selector object has been supplied to the TestSelector object
-        and fileobj is not a FileMock or a FileDescriptor returned by
-        FileMock.fileno(), the object will be registered to the real selector.
+        If a real selector object has been supplied to the
+        :class:`~asynctest.TestSelector` object and ``fileobj`` is not
+        a :class:`~asynctest.FileMock` or a :class:`~asynctest.FileDescriptor`
+        returned by :meth:`FileMock.fileno()`, the object will be registered to
+        the real selector.
 
-        See the documentation of selectors.BaseSelector.
+        See :meth:`selectors.BaseSelector.register`.
         """
         if isfilemock(fileobj) or self._selector is None:
             key = super().register(fileobj, events, data)
@@ -131,9 +161,9 @@ class TestSelector(selectors._BaseSelectorImpl):
 
     def unregister(self, fileobj):
         """
-        Unregister a file object or a FileMock.
+        Unregister a file object or a :class:`~asynctest.FileMock`.
 
-        See the documentation of selectors.BaseSelector.
+        See :meth:`selectors.BaseSelector.unregister`.
         """
         if isfilemock(fileobj) or self._selector is None:
             key = super().unregister(fileobj)
@@ -146,6 +176,13 @@ class TestSelector(selectors._BaseSelectorImpl):
         return key
 
     def modify(self, fileobj, events, data=None):
+        """
+        Shortcut when calling :meth:`TestSelector.unregister` then
+        :meth:`TestSelector.register` to update the registration of a an object
+        to the selector.
+
+        See :meth:`selectors.BaseSelector.modify`.
+        """
         if isfilemock(fileobj) or self._selector is None:
             key = super().modify(fileobj, events, data)
         else:
@@ -165,6 +202,8 @@ class TestSelector(selectors._BaseSelectorImpl):
         Perfom the selection.
 
         This method is a no-op if no actual selector has been supplied.
+
+        See :meth:`selectors.BaseSelector.select`.
         """
         if self._selector is None:
             return []
@@ -176,6 +215,8 @@ class TestSelector(selectors._BaseSelectorImpl):
         Close the selector.
 
         Close the actual selector if supplied, unregister all mocks.
+
+        See :meth:`selectors.BaseSelector.close`.
         """
         if self._selector is not None:
             self._selector.close()
