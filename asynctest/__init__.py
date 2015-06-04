@@ -2,7 +2,7 @@
 # flake8: noqa
 """
 The package asynctest is built on top of the standard :mod:`unittest` module
-and cuts boilerplate code when testing libraries for :mod:`asyncio`.
+and cuts down boilerplate code when testing libraries for :mod:`asyncio`.
 
 Currently, asynctest only supports Python 3.4.
 

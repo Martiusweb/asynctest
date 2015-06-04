@@ -3,7 +3,7 @@ asynctest
 =========
 
 The package asynctest is built on top of the standard unittest module and
-cuts boilerplate code when testing libraries for asyncio.
+cuts down boilerplate code when testing libraries for asyncio.
 
 Currently, asynctest only supports Python 3.4.
 
