@@ -114,7 +114,9 @@ todo_include_todos = True
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'alabaster'
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
+html_theme = 'default' if on_rtd else 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the

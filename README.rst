@@ -16,7 +16,10 @@ Apache 2 license.
 Documentation
 -------------
 
-Full documentation is available at http://asynctest.readthedocs.org/en/latest/
+.. image:: https://readthedocs.org/projects/asynctest/badge/
+   :target: http://asynctest.readthedocs.org/en/latest/
+
+Full documentation is available at http://asynctest.readthedocs.org/en/latest/,
 
 Features
 --------
