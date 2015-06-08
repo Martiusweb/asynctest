@@ -103,6 +103,18 @@ class Test_TestCase(unittest.TestCase):
         result = Test.FooTestCase().run()
         self.assertEqual(1, len(result.failures))
 
+    def test_fails_when_loop_ran_only_during_setup(self):
+        class TestCase(Test.FooTestCase):
+            def setUp(self):
+                self.loop.run_until_complete(asyncio.sleep(0, loop=self.loop))
+
+        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+            TestCase().debug()
+
+        result = TestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+
     def test_passes_when_ignore_loop_or_loop_run(self):
         @asynctest.ignore_loop
         class IgnoreLoopClassTest(Test.FooTestCase):

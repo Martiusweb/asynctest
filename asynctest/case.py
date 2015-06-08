@@ -89,6 +89,9 @@ class TestCase(unittest.case.TestCase):
                 self.loop.run_until_complete(self.setUp())
             else:
                 self.setUp()
+
+            # don't take into account if the loop ran during setUp
+            self.loop.__asynctest_ran = False
         except:
             self._unset_loop()
             raise
