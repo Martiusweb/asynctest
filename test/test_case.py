@@ -114,6 +114,16 @@ class Test_TestCase(unittest.TestCase):
         result = TestCase().run()
         self.assertEqual(1, len(result.failures))
 
+    def test_fails_when_loop_ran_only_during_cleanup(self):
+        class TestCase(Test.FooTestCase):
+            def setUp(self):
+                self.addCleanup(asyncio.coroutine(lambda: None))
+
+        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+            TestCase().debug()
+
+        result = TestCase().run()
+        self.assertEqual(1, len(result.failures))
 
     def test_passes_when_ignore_loop_or_loop_run(self):
         @asynctest.ignore_loop
@@ -183,6 +193,39 @@ class Test_TestCase(unittest.TestCase):
 
                     getattr(case, method)()
                     self.assertTrue(case.ran)
+
+    def test_cleanup_functions_can_be_coroutines(self):
+        cleanup_normal_called = False
+        cleanup_normal_called_too_soon = False
+        cleanup_coro_called = False
+
+        def cleanup_normal():
+            nonlocal cleanup_normal_called
+            cleanup_normal_called = True
+
+        @asyncio.coroutine
+        def cleanup_coro():
+            nonlocal cleanup_coro_called
+            cleanup_coro_called = True
+
+        @asynctest.ignore_loop
+        class TestCase(Test.FooTestCase):
+            def setUp(self):
+                nonlocal cleanup_normal_called, cleanup_normal_called_too_soon
+                nonlocal cleanup_coro_called
+
+                cleanup_normal_called = cleanup_coro_called = False
+
+                self.addCleanup(cleanup_normal)
+                cleanup_normal_called_too_soon = cleanup_normal_called
+
+                self.addCleanup(cleanup_coro)
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(TestCase(), method)()
+                self.assertTrue(cleanup_normal_called)
+                self.assertTrue(cleanup_coro_called)
 
     def test_loop_uses_TestSelector(self):
         @asynctest.ignore_loop

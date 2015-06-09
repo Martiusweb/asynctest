@@ -17,6 +17,9 @@ Enhance :class:`unittest.TestCase`:
 * :meth:`~TestCase.setUp()` and :meth:`~TestCase.tearDown()` methods can be
   coroutine functions,
 
+* cleanup functions registered with :meth:`~TestCase.addCleanup()` can be
+  coroutine functions,
+
 * a test fails if the loop did not run during the test.
 """
 
@@ -83,27 +86,21 @@ class TestCase(unittest.case.TestCase):
 
     def _setUp(self):
         self._init_loop()
+        self.addCleanup(self._unset_loop)
 
-        try:
-            if asyncio.iscoroutinefunction(self.setUp):
-                self.loop.run_until_complete(self.setUp())
-            else:
-                self.setUp()
+        if asyncio.iscoroutinefunction(self.setUp):
+            self.loop.run_until_complete(self.setUp())
+        else:
+            self.setUp()
 
-            # don't take into account if the loop ran during setUp
-            self.loop.__asynctest_ran = False
-        except:
-            self._unset_loop()
-            raise
+        # don't take into account if the loop ran during setUp
+        self.loop.__asynctest_ran = False
 
     def _tearDown(self):
-        try:
-            if asyncio.iscoroutinefunction(self.tearDown):
-                self.loop.run_until_complete(self.tearDown())
-            else:
-                self.tearDown()
-        finally:
-            self._unset_loop()
+        if asyncio.iscoroutinefunction(self.tearDown):
+            self.loop.run_until_complete(self.tearDown())
+        else:
+            self.tearDown()
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
     def run(self, result=None):
@@ -199,6 +196,18 @@ class TestCase(unittest.case.TestCase):
 
         if not self.loop.__asynctest_ran:
             self.fail("Loop did not run during the test")
+
+    def addCleanup(self, function, *args, **kwargs):
+        """
+        Add a function, with arguments, to be called when the test is
+        completed. If function is a coroutine function, it will run on the loop
+        before it's cleaned.
+        """
+        if asyncio.iscoroutinefunction(function):
+            return super().addCleanup(self.loop.run_until_complete,
+                                      function(*args, **kwargs))
+
+        return super().addCleanup(function, *args, **kwargs)
 
 
 class FunctionTestCase(TestCase, unittest.FunctionTestCase):
