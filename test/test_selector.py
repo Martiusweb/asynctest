@@ -150,6 +150,26 @@ class Test_TestSelector(Selector_TestCase):
                 selector_mock.modify.assertCalledWith(devnull, selectors.EVENT_READ, "data2")
 
     @selector_subtest
+    def test_modify_fd(self, selector, selector_mock):
+        fd = 1
+
+        if selector_mock:
+            selector_mock.modify.return_value = selectors.SelectorKey(
+                fd, fd, selectors.EVENT_READ, "data2"
+            )
+
+        original_key = selector.register(fd, selectors.EVENT_READ, "data")
+        original_key = copy.copy(original_key)
+
+        key = selector.modify(fd, selectors.EVENT_READ, "data2")
+
+        self.assertNotEqual(original_key, key)
+        self.assertEqual(key, selector.get_map()[fd])
+
+        if selector_mock:
+            selector_mock.modify.assertCalledWith(fd, selectors.EVENT_READ, "data2")
+
+    @selector_subtest
     def test_modify_but_selector_raises(self, selector, selector_mock):
         if not selector_mock:
             return
@@ -158,7 +178,7 @@ class Test_TestSelector(Selector_TestCase):
         selector_mock.modify.side_effect = exception
 
         with open(os.devnull, 'r') as devnull:
-            key = selector.register(devnull, selectors.EVENT_READ, "data")
+            selector.register(devnull, selectors.EVENT_READ, "data")
 
             with self.assertRaises(type(exception)) as ctx:
                 selector.modify(devnull, selectors.EVENT_READ, "data2")

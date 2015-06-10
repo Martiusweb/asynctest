@@ -53,6 +53,8 @@ def fd(fileobj):
     If ``fileobj`` is a :class:`~asynctest.FileDescriptor`, ``fileobj`` is
     returned, else ``fileobj.fileno()``  is returned instead.
 
+    Note that if fileobj is an int, :exc:`ValueError` is raised.
+
     :raise ValueError: if filobj is not a :class:`~asynctest.FileMock`,
                        a file-like object or
                        a :class:`~asynctest.FileDescriptor`.
@@ -60,7 +62,7 @@ def fd(fileobj):
     try:
         return fileobj if isinstance(fileobj, FileDescriptor) else fileobj.fileno()
     except Exception:
-        raise ValueError from None
+        raise ValueError
 
 
 def isfilemock(obj):
@@ -187,8 +189,10 @@ class TestSelector(selectors._BaseSelectorImpl):
             key = super().modify(fileobj, events, data)
         else:
             # del the key first because modify() fails if events is incorrect
-            if fd(fileobj) in self._fd_to_key:
-                del self._fd_to_key[fd(fileobj)]
+            fd = self._fileobj_lookup(fileobj)
+
+            if fd in self._fd_to_key:
+                del self._fd_to_key[fd]
 
             key = self._selector.modify(fileobj, events, data)
 
