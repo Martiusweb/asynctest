@@ -483,3 +483,36 @@ call = unittest.mock.call
 create_autospec = unittest.mock.create_autospec
 # TODO create_autospec: call the original method and recreate the object
 PropertyMock = unittest.mock.PropertyMock
+
+
+def return_once(value, then=None):
+    """
+    Helper to use with ``side_effect``, so a mock will return a given value
+    only once, then return another value.
+
+    When used as a ``side_effect`` value, if one of ``value`` or ``then`` is an
+    :class:`Exception` type, an instance of this exception will be raised.
+
+    >>> mock.recv = Mock(side_effect=return_once(b"data"))
+    >>> mock.recv()
+    b"data"
+    >>> repr(mock.recv())
+    'None'
+    >>> repr(mock.recv())
+    'None'
+
+    >>> mock.recv = Mock(side_effect=return_once(b"data", then=BlockingIOError))
+    >>> mock.recv()
+    b"data"
+    >>> mock.recv()
+    Traceback BlockingIOError
+
+    :param value: value to be returned once by the mock when called.
+
+    :param then: value returned for any subsequent call.
+
+    .. versionadded:: 0.4
+    """
+    yield value
+    while True:
+        yield then

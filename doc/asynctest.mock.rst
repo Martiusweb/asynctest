@@ -63,3 +63,5 @@
     ~~~~~~~
 
     .. autofunction:: asynctest.mock_open
+
+    .. autofunction:: asynctest.return_once

@@ -310,5 +310,55 @@ class Test_patch_dict(unittest.TestCase):
         self.assertTrue(a_coroutine())
 
 
+class Test_return_once(unittest.TestCase):
+    def test_default_value(self):
+        iterator = asynctest.mock.return_once("ProbeValue")
+        self.assertEqual("ProbeValue", next(iterator))
+        for _ in range(3):
+            self.assertIsNone(next(iterator))
+
+    def test_then(self):
+        iterator = asynctest.mock.return_once("ProbeValue", "ThenValue")
+        self.assertEqual("ProbeValue", next(iterator))
+        for _ in range(2):
+            self.assertEqual("ThenValue", next(iterator))
+
+        iterator = asynctest.mock.return_once("ProbeValue", then="ThenValue")
+        self.assertEqual("ProbeValue", next(iterator))
+        self.assertEqual("ThenValue", next(iterator))
+
+    def test_with_side_effect_default(self):
+        mock = asynctest.Mock(side_effect=asynctest.mock.return_once("ProbeValue"))
+        self.assertEqual("ProbeValue", mock())
+        for _ in range(3):
+            self.assertIsNone(mock())
+
+    def test_with_side_effect_then(self):
+        side_effect = asynctest.mock.return_once("ProbeValue", "ThenValue")
+        mock = asynctest.Mock(side_effect=side_effect)
+        self.assertEqual("ProbeValue", mock())
+        for _ in range(2):
+            self.assertEqual("ThenValue", mock())
+
+    def test_with_side_effect_raises(self):
+        mock = asynctest.mock.Mock(side_effect=asynctest.mock.return_once(Exception))
+        self.assertRaises(Exception, mock)
+        self.assertIsNone(mock())
+
+    def test_with_side_effect_raises_then(self):
+        side_effect = asynctest.mock.return_once("ProbeValue", BlockingIOError)
+        mock = asynctest.mock.Mock(side_effect=side_effect)
+        self.assertEqual("ProbeValue", mock())
+        for _ in range(2):
+            self.assertRaises(BlockingIOError, mock)
+
+    def test_with_side_effect_raises_all(self):
+        side_effect = asynctest.mock.return_once(Exception, BlockingIOError)
+        mock = asynctest.mock.Mock(side_effect=side_effect)
+        self.assertRaises(Exception, mock)
+        for _ in range(2):
+            self.assertRaises(BlockingIOError, mock)
+
+
 if __name__ == "__main__":
     unittest.main()
