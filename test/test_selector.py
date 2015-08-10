@@ -41,6 +41,7 @@ class Test_SocketMock(Selector_TestCase):
     def test_is_socket(self):
         self.assertIsInstance(asynctest.selector.SocketMock(), socket.socket)
 
+
 def selector_subtest(method):
     @functools.wraps(method)
     def wrapper(self):
@@ -78,9 +79,9 @@ class Test_TestSelector(Selector_TestCase):
             self.assertEqual(key, selector.get_map()[devnull])
 
             if selector_mock:
-                selector_mock.register.assertCalledWith(devnull,
-                                                        selectors.EVENT_READ,
-                                                        "data")
+                selector_mock.register.assert_called_with(devnull,
+                                                          selectors.EVENT_READ,
+                                                          "data")
 
     @selector_subtest
     def test_unregister_mock(self, selector, selector_mock):
@@ -126,9 +127,6 @@ class Test_TestSelector(Selector_TestCase):
         self.assertNotEqual(original_key, key)
         self.assertEqual(key, selector.get_map()[mock])
 
-        if selector_mock:
-            selector_mock.modify.assertCalledWith(mock, RW, "data")
-
     @selector_subtest
     def test_modify_fileno(self, selector, selector_mock):
         with open(os.devnull, 'r') as devnull:
@@ -147,7 +145,7 @@ class Test_TestSelector(Selector_TestCase):
             self.assertEqual(key, selector.get_map()[devnull])
 
             if selector_mock:
-                selector_mock.modify.assertCalledWith(devnull, selectors.EVENT_READ, "data2")
+                selector_mock.modify.assert_called_with(devnull, selectors.EVENT_READ, "data2")
 
     @selector_subtest
     def test_modify_fd(self, selector, selector_mock):
@@ -167,7 +165,7 @@ class Test_TestSelector(Selector_TestCase):
         self.assertEqual(key, selector.get_map()[fd])
 
         if selector_mock:
-            selector_mock.modify.assertCalledWith(fd, selectors.EVENT_READ, "data2")
+            selector_mock.modify.assert_called_with(fd, selectors.EVENT_READ, "data2")
 
     @selector_subtest
     def test_modify_but_selector_raises(self, selector, selector_mock):
@@ -191,7 +189,7 @@ class Test_TestSelector(Selector_TestCase):
         if selector_mock:
             selector_mock.select.return_value = ["ProbeValue"]
             self.assertEqual(["ProbeValue"], selector.select(5))
-            selector_mock.select.assertCalledWith(5)
+            selector_mock.select.assert_called_with(5)
         else:
             self.assertEqual([], selector.select())
 
@@ -201,4 +199,4 @@ class Test_TestSelector(Selector_TestCase):
             return
 
         selector.close()
-        selector_mock.close.assertCalledWith()
+        selector_mock.close.assert_called_with()

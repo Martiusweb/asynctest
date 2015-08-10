@@ -5,7 +5,8 @@ asynctest
 The package asynctest is built on top of the standard unittest module and
 cuts down boilerplate code when testing libraries for asyncio.
 
-Currently, asynctest only supports Python 3.4.
+Currently, asynctest has not been tested against the new async/await syntax
+introduced in Python 3.5.
 
 Author & license
 ----------------
