@@ -113,6 +113,63 @@ class SocketMock(FileMock):
                          spec_set=spec_set, parent=parent, **kwargs)
 
 
+def _set_event_ready(fileobj, loop, event):
+    selector = loop._selector
+    fd = selector._fileobj_lookup(fileobj)
+
+    if fd in selector._fd_to_key:
+        loop._process_events([(selector._fd_to_key[fd], event)])
+
+
+def set_read_ready(fileobj, loop):
+    """
+    Schedule callbacks registered on ``loop`` as if the selector notified that
+    data is ready to be read on ``fileobj``.
+
+    :param fileobj: file object or :class:`~asynctest.FileMock` on which the
+                    event is mocked.
+
+    :param loop: :class:`asyncio.SelectorEventLoop` watching for events on
+                 ``fileobj``.
+
+    ::
+
+        mock = asynctest.SocketMock()
+        mock.recv.return_value = b"Data"
+
+        def read_ready(sock):
+            print("received:", sock.recv(1024))
+
+        loop.add_reader(mock, read_ready, mock)
+
+        set_read_ready()
+
+        loop.run_forever() # prints received: b"Data"
+
+    .. versionadded:: 0.4
+    """
+    # since the selector whould notify of events at the begining of the next
+    # iteration, we let this iteration finish before actually scheduling the
+    # reader (hence the call_soon)
+    loop.call_soon_threadsafe(_set_event_ready, fileobj, loop, selectors.EVENT_READ)
+
+
+def set_write_ready(fileobj, loop):
+    """
+    Schedule callbacks registered on ``loop`` as if the selector notified that
+    data can be written to ``fileobj``.
+
+    :param fileobj: file obkect or  :class:`~asynctest.FileMock` on which th
+    event is mocked.
+
+    :param loop: :class:`asyncio.SelectorEventLoop` watching for events on
+    ``fileobj``.
+
+    .. versionadded:: 0.4
+    """
+    loop.call_soon_threadsafe(_set_event_ready, fileobj, loop, selectors.EVENT_WRITE)
+
+
 class TestSelector(selectors._BaseSelectorImpl):
     """
     A selector which supports IOMock objects.

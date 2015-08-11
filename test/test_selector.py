@@ -1,5 +1,6 @@
 # coding: utf-8
 
+import asyncio
 import copy
 import selectors
 import functools
@@ -200,3 +201,51 @@ class Test_TestSelector(Selector_TestCase):
 
         selector.close()
         selector_mock.close.assert_called_with()
+
+
+class Test_set_read_write_ready(Selector_TestCase):
+    def setUp(self):
+        super().setUp()
+
+        self.loop = asyncio.new_event_loop()
+        self.loop._selector = asynctest.selector.TestSelector(self.loop._selector)
+        self.addCleanup(self.loop.close)
+        self.mock = asynctest.selector.FileMock()
+
+    def test_nothing_scheduled(self):
+        # nothing will happen (no exception)
+        for mode in ('read', 'write'):
+            with self.subTest(mode=mode):
+                getattr(asynctest.selector, 'set_{}_ready'.format(mode))(self.mock, self.loop)
+                self.loop.run_until_complete(asyncio.sleep(0, loop=self.loop))
+
+    def test_callback_scheduled(self):
+        for mode in ('read', 'write'):
+            with self.subTest(mode=mode):
+                future = asyncio.Future(loop=self.loop)
+                callback_mock = unittest.mock.Mock()
+
+                # We need at least to iterations of the loop
+                self.loop.call_soon(self.loop.call_soon, future.set_result, None)
+
+                getattr(self.loop, 'add_{}er'.format(mode.strip('e')))(self.mock, callback_mock)
+                getattr(asynctest.selector, 'set_{}_ready'.format(mode))(self.mock, self.loop)
+
+                self.loop.run_until_complete(future)
+                callback_mock.assert_called_with()
+
+    def test_callback_scheduled_during_current_iteration(self):
+        for mode in ('read', 'write'):
+            with self.subTest(mode=mode):
+                future = asyncio.Future(loop=self.loop)
+                callback_mock = unittest.mock.Mock()
+
+                # We need at least to iterations of the loop
+                self.loop.call_soon(self.loop.call_soon, future.set_result, None)
+
+                self.loop.call_soon(getattr(self.loop, 'add_{}er'.format(mode.strip('e'))),
+                                    self.mock, callback_mock)
+                getattr(asynctest.selector, 'set_{}_ready'.format(mode))(self.mock, self.loop)
+
+                self.loop.run_until_complete(future)
+                callback_mock.assert_called_with()

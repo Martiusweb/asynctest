@@ -6,7 +6,8 @@ The package asynctest is built on top of the standard unittest module and
 cuts down boilerplate code when testing libraries for asyncio.
 
 Currently, asynctest has not been tested against the new async/await syntax
-introduced in Python 3.5.
+introduced in Python 3.5, and target the "selector" model, hence, some features
+twill not (yet) work with Windows' proactor.
 
 Author & license
 ----------------
@@ -54,6 +55,9 @@ Mock and CoroutineMock
 
   - mock_open() returns a MagickMock object by default.
 
+  - return_once() can be used with Mock.side_effect to return a value only
+    once when a mock is called.
+
 
 Selectors
 ~~~~~~~~~
@@ -72,6 +76,9 @@ The module asynctest.selector provides classes to mock objects performing IO
     loop by calling `loop._selector = TestSelector(loop._selector)`, and will
     intercept mock so they don't get registered to the actual selector.
 
+  - set_read_ready() and set_write_ready() to force read and write event
+    callbacks to be scheduled on the loop.
+
 Helpers
 ~~~~~~~
 
@@ -79,11 +86,18 @@ Helpers
     should be called immediatly are executed, which is useful when the test
     author needs to assert things which are not yet executed by the loop.
 
+Roadmap
+-------
+
+I hope I will find time to develop and release the following features:
+
+- async/await support (0.5 ?)
+- proactor support (0.6 ?)
 
 Tests
 -----
 
-How to run the tests?
+asynctest is unit tested. You can run asynctest test suite with this command:
 
 ::
 

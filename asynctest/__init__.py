@@ -4,7 +4,9 @@
 The package asynctest is built on top of the standard :mod:`unittest` module
 and cuts down boilerplate code when testing libraries for :mod:`asyncio`.
 
-Currently, asynctest only supports Python 3.4.
+Currently, asynctest has not been tested against the new async/await syntax
+introduced in Python 3.5, and target the "selector" model, hence, some features
+will not (yet) work with Windows' proactor.
 
 asynctest imports the standard unittest package, overrides some of its features
 and adds new ones. A test author can import asynctest in place of

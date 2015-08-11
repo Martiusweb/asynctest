@@ -33,3 +33,10 @@
     .. autoclass:: asynctest.TestSelector
         :members:
         :undoc-members:
+
+    Helpers
+    #######
+
+    .. autofunction:: asynctest.set_read_ready
+
+    .. autofunction:: asynctest.set_write_ready
