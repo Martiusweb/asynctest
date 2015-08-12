@@ -7,7 +7,7 @@ cuts down boilerplate code when testing libraries for asyncio.
 
 Currently, asynctest has not been tested against the new async/await syntax
 introduced in Python 3.5, and target the "selector" model, hence, some features
-twill not (yet) work with Windows' proactor.
+will not (yet) work with Windows' proactor.
 
 Author & license
 ----------------
@@ -77,7 +77,7 @@ The module asynctest.selector provides classes to mock objects performing IO
     intercept mock so they don't get registered to the actual selector.
 
   - set_read_ready() and set_write_ready() to force read and write event
-    callbacks to be scheduled on the loop.
+    callbacks to be scheduled on the loop, as if the selector scheduled them.
 
 Helpers
 ~~~~~~~
