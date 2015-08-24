@@ -119,6 +119,8 @@ class SSLSocketMock(SocketMock):
     Mock a socket wrapped by the :mod:`ssl` module.
 
     See :class:`~asynctest.FileMock`.
+
+    .. versionadded:: 0.5
     """
     def __init__(self, side_effect=None, return_value=mock.DEFAULT,
                  wraps=None, name=None, spec_set=None, parent=None,
