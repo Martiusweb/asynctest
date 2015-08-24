@@ -68,6 +68,32 @@ class Test_TestCase(unittest.TestCase):
                 mock_loop.close.assert_called_with()
                 self.assertFalse(case.failing)
 
+    def create_default_loop(self):
+        default_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(default_loop)
+        self.addCleanup(default_loop.close)
+        return default_loop
+
+    def test_use_default_loop(self):
+        default_loop = self.create_default_loop()
+
+        class Using_Default_Loop_TestCase(asynctest.TestCase):
+            use_default_loop = True
+
+            @asynctest.ignore_loop
+            def runTest(self):
+                self.assertIs(default_loop, self.loop)
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = Using_Default_Loop_TestCase()
+                result = getattr(case, method)()
+
+                if result:
+                    self.assertTrue(result.wasSuccessful())
+
+            self.assertFalse(default_loop.is_closed())
+
     def test_coroutinefunction_executed(self):
         class CoroutineFunctionTest(asynctest.TestCase):
             ran = False
@@ -103,27 +129,63 @@ class Test_TestCase(unittest.TestCase):
         result = Test.FooTestCase().run()
         self.assertEqual(1, len(result.failures))
 
-    def test_fails_when_loop_ran_only_during_setup(self):
+    def test_fails_when_loop_didnt_run_using_default_loop(self):
         class TestCase(Test.FooTestCase):
-            def setUp(self):
-                self.loop.run_until_complete(asyncio.sleep(0, loop=self.loop))
+            use_default_loop = True
+
+        default_loop = self.create_default_loop()
 
         with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
             TestCase().debug()
 
         result = TestCase().run()
         self.assertEqual(1, len(result.failures))
+
+        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
+
+        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+            TestCase().debug()
+
+        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
+
+        result = TestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+    def test_fails_when_loop_ran_only_during_setup(self):
+        for test_use_default_loop in (False, True):
+            with self.subTest(use_default_loop=test_use_default_loop):
+                if test_use_default_loop:
+                    self.create_default_loop()
+
+                class TestCase(Test.FooTestCase):
+                    use_default_loop = test_use_default_loop
+
+                    def setUp(self):
+                        self.loop.run_until_complete(asyncio.sleep(0, loop=self.loop))
+
+                with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+                    TestCase().debug()
+
+                result = TestCase().run()
+                self.assertEqual(1, len(result.failures))
 
     def test_fails_when_loop_ran_only_during_cleanup(self):
-        class TestCase(Test.FooTestCase):
-            def setUp(self):
-                self.addCleanup(asyncio.coroutine(lambda: None))
+        for test_use_default_loop in (False, True):
+            with self.subTest(use_default_loop=test_use_default_loop):
+                if test_use_default_loop:
+                    self.create_default_loop()
 
-        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
-            TestCase().debug()
+                class TestCase(Test.FooTestCase):
+                    use_default_loop = test_use_default_loop
 
-        result = TestCase().run()
-        self.assertEqual(1, len(result.failures))
+                    def setUp(self):
+                        self.addCleanup(asyncio.coroutine(lambda: None))
+
+                with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+                    TestCase().debug()
+
+                result = TestCase().run()
+                self.assertEqual(1, len(result.failures))
 
     def test_passes_when_ignore_loop_or_loop_run(self):
         @asynctest.ignore_loop

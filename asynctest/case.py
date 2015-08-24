@@ -35,9 +35,6 @@ import asynctest.selector
 
 class TestCase(unittest.case.TestCase):
     """
-    For each test, a new loop is created and is set as the default loop. Test
-    authors can retrieve this loop with :attr:`~asynctest.TestCase.loop`.
-
     if :meth:`setUp()` and :meth:`tearDown()` are coroutine functions, they
     will run on the loop.
 
@@ -51,19 +48,60 @@ class TestCase(unittest.case.TestCase):
     function or :class:`~asynctest.TestCase` class can be decorated with
     :func:`~asynctest.ignore_loop`.
 
+    By default, a new loop is created and is set as the default loop before each
+    test. Test authors can retrieve this loop with
+    :attr:`~asynctest.TestCase.loop`.
+
+    If :attr:`~asynctest.TestCase.use_default_loop` is set to True, the current
+    default event loop is used instead. In this case, it is up to the test
+    author to deal with the state of the loop in each test: the loop might be
+    closed, callbacks and tasks may be scheduled by previous tests. It is also
+    up to the test author to close the loop and dispose the related resources.
+
+    This behavior should be configured when defining the test case class:
+
+    ::
+
+        class With_Reusable_Loop_TestCase(asynctest.TestCase):
+            use_default_loop = True
+
+            def test_something(self):
+                pass
+
+
+    .. versionadded:: 0.5
+
+        attribute :attr:`~asynctest.TestCase.use_default_loop`.
+
     """
+    #: If true, the loop used by the test case is the current default event
+    #: loop returned by :func:`asyncio.get_event_loop()`. The loop will not be
+    #: closed and recreated between tests.
+    use_default_loop = False
+
     #: Event loop created and set as default event loop during the test.
     loop = None
 
     def _init_loop(self):
-        self.loop = self._patch_loop(asyncio.new_event_loop())
+        if self.use_default_loop:
+            self.loop = asyncio.get_event_loop()
+        else:
+            self.loop = asyncio.new_event_loop()
+
+        self.loop = self._patch_loop(self.loop)
         asyncio.set_event_loop(self.loop)
 
     def _unset_loop(self):
-        self.loop.close()
+        if not self.use_default_loop:
+            self.loop.close()
+
         self.loop = None
 
     def _patch_loop(self, loop):
+        if hasattr(loop, '__asynctest_ran'):
+            # The loop is already patched
+            return loop
+
         loop.__asynctest_ran = False
 
         def wraps(method):
