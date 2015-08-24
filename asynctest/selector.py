@@ -13,6 +13,7 @@ work to a real selector.
 
 import selectors
 import socket
+import ssl
 
 from . import mock
 
@@ -111,6 +112,20 @@ class SocketMock(FileMock):
         super().__init__(socket.socket, side_effect=side_effect,
                          return_value=return_value, wraps=wraps, name=name,
                          spec_set=spec_set, parent=parent, **kwargs)
+
+
+class SSLSocketMock(SocketMock):
+    """
+    Mock a socket wrapped by the :mod:`ssl` module.
+
+    See :class:`~asynctest.FileMock`.
+    """
+    def __init__(self, side_effect=None, return_value=mock.DEFAULT,
+                 wraps=None, name=None, spec_set=None, parent=None,
+                 **kwargs):
+        FileMock.__init__(self, ssl.SSLSocket, side_effect=side_effect,
+                          return_value=return_value, wraps=wraps, name=name,
+                          spec_set=spec_set, parent=parent, **kwargs)
 
 
 def _set_event_ready(fileobj, loop, event):

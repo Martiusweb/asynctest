@@ -15,6 +15,11 @@
         :undoc-members:
         :show-inheritance:
 
+    .. autoclass:: asynctest.SSLSocketMock
+        :members:
+        :undoc-members:
+        :show-inheritance:
+
     .. autoclass:: asynctest.FileDescriptor
         :members:
         :undoc-members:

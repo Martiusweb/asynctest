@@ -6,6 +6,7 @@ import selectors
 import functools
 import os
 import socket
+import ssl
 import unittest
 
 import asynctest
@@ -41,6 +42,11 @@ class Test_FileMock(Selector_TestCase):
 class Test_SocketMock(Selector_TestCase):
     def test_is_socket(self):
         self.assertIsInstance(asynctest.selector.SocketMock(), socket.socket)
+
+
+class Test_SSLSocketMock(Selector_TestCase):
+    def test_is_ssl_socket(self):
+        self.assertIsInstance(asynctest.selector.SSLSocketMock(), ssl.SSLSocket)
 
 
 def selector_subtest(method):
