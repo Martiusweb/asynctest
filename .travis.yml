@@ -3,6 +3,7 @@ python:
     - "3.4"
     - "3.5"
     - "nightly"
+install:
 script:
     - python -m unittest test
     - PYTHONASYNCIODEBUG=1 python -m unittest test
