@@ -356,6 +356,7 @@ class _patch(unittest.mock._patch):
             return super().decorate_callable(func)
 
         @functools.wraps(func)
+        @asyncio.coroutine
         def patched(*args, **keywargs):
             extra_args = []
             entered_patchers = []
@@ -461,6 +462,7 @@ class _patch_dict(unittest.mock._patch_dict):
             return super().__call__(f)
 
         @functools.wraps(f)
+        @asyncio.coroutine
         def _inner(*args, **kw):
             self._patch_dict()
             try:

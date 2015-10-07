@@ -5,9 +5,8 @@ asynctest
 The package asynctest is built on top of the standard unittest module and
 cuts down boilerplate code when testing libraries for asyncio.
 
-Currently, asynctest has not been tested against the new async/await syntax
-introduced in Python 3.5, and target the "selector" model, hence, some features
-will not (yet) work with Windows' proactor.
+Currently, asynctest targets the "selector" model, hence, some features
+will not (yet?) work with Windows' proactor.
 
 Author & license
 ----------------
@@ -91,8 +90,8 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
-- async/await support (0.5 ?)
-- proactor support (0.6 ?)
+- set of warnings against common mistakes (0.6 ?)
+- proactor support (0.7 ?)
 
 Tests
 -----

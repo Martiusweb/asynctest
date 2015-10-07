@@ -4,8 +4,14 @@ import asyncio
 import itertools
 import unittest
 import unittest.mock
+import sys
 
 import asynctest
+
+if sys.version_info >= (3, 5):
+    from . import test_case_await as _using_await
+else:
+    _using_await = None
 
 
 class Test:
@@ -103,11 +109,16 @@ class Test_TestCase(unittest.TestCase):
                 self.ran = True
                 yield from []
 
+        cases = [CoroutineFunctionTest()]
+        if _using_await:
+            cases.append(_using_await.CoroutineFunctionTest())
+
         for method in self.run_methods:
             with self.subTest(method=method):
-                case = CoroutineFunctionTest()
-                getattr(case, method)()
-                self.assertTrue(case.ran)
+                for case in cases:
+                    with self.subTest(case=case):
+                        getattr(case, method)()
+                        self.assertTrue(case.ran)
 
     def test_coroutine_returned_executed(self):
         class CoroutineTest(asynctest.TestCase):
@@ -116,11 +127,16 @@ class Test_TestCase(unittest.TestCase):
             def runTest(self):
                 return asyncio.coroutine(lambda: setattr(self, 'ran', True))()
 
+        cases = [CoroutineTest()]
+        if _using_await:
+            cases.append(_using_await.CoroutineTest())
+
         for method in self.run_methods:
             with self.subTest(method=method):
-                case = CoroutineTest()
-                getattr(case, method)()
-                self.assertTrue(case.ran)
+                for case in cases:
+                    with self.subTest(case=case):
+                        getattr(case, method)()
+                        self.assertTrue(case.ran)
 
     def test_fails_when_loop_didnt_run(self):
         with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
