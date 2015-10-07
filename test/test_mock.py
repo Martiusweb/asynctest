@@ -79,7 +79,12 @@ class _Test_called_coroutine:
     def test_returns_coroutine(self, klass):
         mock = klass()
 
-        self.assertTrue(asyncio.iscoroutine(mock()))
+        coro = mock()
+        # Suppress debug warning about non-running coroutine: we known
+        if isinstance(coro, asyncio.coroutines.CoroWrapper):
+            coro.gen = None
+
+        self.assertTrue(asyncio.iscoroutine(coro))
 
     def test_returns_coroutine_from_return_value(self, klass):
         mock = klass()
