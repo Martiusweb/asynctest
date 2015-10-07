@@ -21,4 +21,4 @@ def exhaust_callbacks(loop):
     :param loop: event loop
     """
     while loop._ready:
-        yield from asyncio.sleep(0)
+        yield from asyncio.sleep(0, loop=loop)
