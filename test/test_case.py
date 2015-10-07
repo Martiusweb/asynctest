@@ -55,7 +55,7 @@ class Test_TestCase(unittest.TestCase):
         for method, test in itertools.product(self.run_methods, ('runTest', 'runFailingTest', )):
             with self.subTest(method=method, test=test), \
                     unittest.mock.patch('asyncio.new_event_loop') as mock:
-                mock_loop = unittest.mock.Mock(asyncio.BaseEventLoop)
+                mock_loop = unittest.mock.Mock(asyncio.AbstractEventLoop)
                 mock.return_value = mock_loop
 
                 case = LoopTest(test)

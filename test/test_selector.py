@@ -7,6 +7,7 @@ import functools
 import os
 import socket
 import ssl
+import sys
 import unittest
 
 import asynctest
@@ -218,6 +219,10 @@ class Test_set_read_write_ready(Selector_TestCase):
         self.addCleanup(self.loop.close)
         self.mock = asynctest.selector.FileMock()
 
+        # Older versions of asyncio may complain with PYTHONASYNCIODEBUG=1
+        if sys.version_info < (3, 5):
+            asyncio.set_event_loop(self.loop)
+
     def test_nothing_scheduled(self):
         # nothing will happen (no exception)
         for mode in ('read', 'write'):
@@ -231,7 +236,7 @@ class Test_set_read_write_ready(Selector_TestCase):
                 future = asyncio.Future(loop=self.loop)
                 callback_mock = unittest.mock.Mock()
 
-                # We need at least to iterations of the loop
+                # We need at least two iterations of the loop
                 self.loop.call_soon(self.loop.call_soon, future.set_result, None)
 
                 getattr(self.loop, 'add_{}er'.format(mode.strip('e')))(self.mock, callback_mock)
@@ -246,7 +251,7 @@ class Test_set_read_write_ready(Selector_TestCase):
                 future = asyncio.Future(loop=self.loop)
                 callback_mock = unittest.mock.Mock()
 
-                # We need at least to iterations of the loop
+                # We need at least two iterations of the loop
                 self.loop.call_soon(self.loop.call_soon, future.set_result, None)
 
                 self.loop.call_soon(getattr(self.loop, 'add_{}er'.format(mode.strip('e'))),
