@@ -20,34 +20,7 @@ def _raise(exception):
     raise exception
 
 
-def _mock_add_spec(self, spec, *args, **kwargs):
-    unittest.mock.NonCallableMock._mock_add_spec(self, spec, *args, **kwargs)
-
-    _spec_coroutines = []
-    for attr in dir(spec):
-        if asyncio.iscoroutinefunction(getattr(spec, attr)):
-            _spec_coroutines.append(attr)
-
-    self.__dict__['_spec_coroutines'] = _spec_coroutines
-
-
-def _get_child_mock(self, *args, _new_name=None, **kwargs):
-        if _new_name in self.__dict__['_spec_coroutines']:
-            return CoroutineMock(*args, **kwargs)
-
-        _type = type(self)
-        if not issubclass(_type, unittest.mock.CallableMixin):
-            if issubclass(_type, unittest.mock.NonCallableMagicMock):
-                klass = MagicMock
-            elif issubclass(_type, NonCallableMock):
-                klass = Mock
-        else:
-            klass = _type.__mro__[1]
-
-        return klass(**kwargs)
-
-
-class FakeInheritance(type):
+class FakeInheritanceMeta(type):
     """
     A metaclass which recreates the original inheritance model from
     unittest.mock.
@@ -83,6 +56,76 @@ class FakeInheritance(type):
         return False
 
 
+def _get_is_coroutine(self):
+    return self.__dict__['_mock_is_coroutine']
+
+
+def _set_is_coroutine(self, value):
+    # property setters and getters are overriden by Mock(), we need to
+    # update the dict to add values
+    self.__dict__['_mock_is_coroutine'] = bool(value)
+
+
+def _mock_add_spec(self, spec, *args, **kwargs):
+    unittest.mock.NonCallableMock._mock_add_spec(self, spec, *args, **kwargs)
+
+    _spec_coroutines = []
+    for attr in dir(spec):
+        if asyncio.iscoroutinefunction(getattr(spec, attr)):
+            _spec_coroutines.append(attr)
+
+    self.__dict__['_spec_coroutines'] = _spec_coroutines
+
+
+def _get_child_mock(self, *args, _new_name=None, **kwargs):
+        if _new_name in self.__dict__['_spec_coroutines']:
+            return CoroutineMock(*args, **kwargs)
+
+        _type = type(self)
+        if not issubclass(_type, unittest.mock.CallableMixin):
+            if issubclass(_type, unittest.mock.NonCallableMagicMock):
+                klass = MagicMock
+            elif issubclass(_type, NonCallableMock):
+                klass = Mock
+        else:
+            klass = _type.__mro__[1]
+
+        return klass(**kwargs)
+
+
+class MockMetaMixin(FakeInheritanceMeta):
+    def __new__(meta, name, base, namespace):
+        if not any((isinstance(baseclass, meta) for baseclass in base)):
+            namespace.update({
+                '_mock_add_spec': _mock_add_spec,
+                '_get_child_mock': _get_child_mock,
+            })
+
+        return super().__new__(meta, name, base, namespace)
+
+
+class IsCoroutineArgMeta(MockMetaMixin):
+    def __new__(meta, name, base, namespace):
+        if not any((isinstance(baseclass, meta) for baseclass in base)):
+            namespace.update({
+                '_asynctest_get_is_coroutine': _get_is_coroutine,
+                '_asynctest_set_is_coroutine': _set_is_coroutine,
+                'is_coroutine': property(_get_is_coroutine, _set_is_coroutine,
+                                         "True if the object mocked is a coroutine"),
+                '_is_coroutine': property(_get_is_coroutine),
+            })
+
+            def __setattr__(self, name, value):
+                if name == 'is_coroutine':
+                    self._asynctest_set_is_coroutine(value)
+                else:
+                    return base[0].__setattr__(self, name, value)
+
+            namespace['__setattr__'] = __setattr__
+
+        return super().__new__(meta, name, base, namespace)
+
+
 # Notes about unittest.mock:
 #  - MagicMock > Mock > NonCallableMock (where ">" means inherits from)
 #  - when a mock instance is created, a new class (type) is created
@@ -90,7 +133,8 @@ class FakeInheritance(type):
 #  - we *must* use magic or object's internals when we want to add our own
 #    properties, and often override __getattr__/__setattr__ which are used
 #    in unittest.mock.NonCallableMock.
-class NonCallableMock(unittest.mock.NonCallableMock, metaclass=FakeInheritance):
+class NonCallableMock(unittest.mock.NonCallableMock,
+                      metaclass=IsCoroutineArgMeta):
     """
     Enhance :class:`unittest.mock.NonCallableMock` with features allowing to
     mock a coroutine function.
@@ -116,73 +160,24 @@ class NonCallableMock(unittest.mock.NonCallableMock, metaclass=FakeInheritance):
         super().__init__(spec=spec, wraps=wraps, name=name, spec_set=spec_set,
                          parent=parent, **kwargs)
 
-        self.__set_is_coroutine(is_coroutine)
-
-    def __get_is_coroutine(self):
-        return self.__dict__['_mock_is_coroutine']
-
-    def __set_is_coroutine(self, value):
-        # property setters and getters are overriden by Mock(), we need to
-        # update the dict to add values
-        self.__dict__['_mock_is_coroutine'] = bool(value)
-
-    is_coroutine = property(__get_is_coroutine, __set_is_coroutine,
-                            "True if the object mocked is a coroutine")
-
-    # asyncio.iscoroutinefunction() checks this property to say if an object is
-    # a coroutine
-    _is_couroutine = property(__get_is_coroutine)
-
-    def __setattr__(self, name, value):
-        if name == 'is_coroutine':
-            self.__set_is_coroutine(value)
-        else:
-            return super().__setattr__(name, value)
-
-    def _mock_add_spec(self, *args, **kwargs):
-        return _mock_add_spec(self, *args, **kwargs)
-
-    def _get_child_mock(self, *args, **kwargs):
-        return _get_child_mock(self, *args, **kwargs)
+        self._asynctest_set_is_coroutine(is_coroutine)
 
 
-class NonCallableMagicMock(unittest.mock.NonCallableMagicMock):
+class NonCallableMagicMock(unittest.mock.NonCallableMagicMock,
+                           metaclass=IsCoroutineArgMeta):
     """
-    A version of :class:`~asynctst.MagicMock` that isn't callable.
+    A version of :class:`~asynctest.MagicMock` that isn't callable.
     """
-    # XXX Currently, I can't find a way to satisfy all the constraints I want
-    # without duplicating code...
     def __init__(self, spec=None, wraps=None, name=None, spec_set=None,
                  is_coroutine=None, parent=None, **kwargs):
 
         super().__init__(spec=spec, wraps=wraps, name=name, spec_set=spec_set,
                          parent=parent, **kwargs)
 
-        self.__set_is_coroutine(is_coroutine)
-
-    def __get_is_coroutine(self):
-        return self.__dict__['_mock_is_coroutine']
-
-    def __set_is_coroutine(self, value):
-        self.__dict__['_mock_is_coroutine'] = bool(value)
-
-    is_coroutine = property(__get_is_coroutine, __set_is_coroutine,
-                            "True if the object mocked is a coroutine")
-
-    def __setattr__(self, name, value):
-        if name == 'is_coroutine':
-            self.__set_is_coroutine(value)
-        else:
-            return super().__setattr__(name, value)
-
-    def _mock_add_spec(self, *args, **kwargs):
-        return _mock_add_spec(self, *args, **kwargs)
-
-    def _get_child_mock(self, *args, **kwargs):
-        return _get_child_mock(self, *args, **kwargs)
+        self._asynctest_set_is_coroutine(is_coroutine)
 
 
-class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
+class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.Mock` so it returns
     a class:`~asynctest.CoroutineMock` object instead of
@@ -210,31 +205,27 @@ class Mock(unittest.mock.Mock, metaclass=FakeInheritance):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
 
+    If you want to mock a coroutine function, use :class:`CoroutineMock`
+    instead.
+
     See :class:`~asynctest.NonCallableMock` for details about :mod:`asynctest`
     features, and :mod:`unittest.mock` for the comprehensive documentation
     about mocking.
     """
-    def _mock_add_spec(self, *args, **kwargs):
-        return _mock_add_spec(self, *args, **kwargs)
-
-    def _get_child_mock(self, *args, **kwargs):
-        return _get_child_mock(self, *args, **kwargs)
 
 
-class MagicMock(unittest.mock.MagicMock):
+class MagicMock(unittest.mock.MagicMock, metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.MagicMock` so it returns
     a :class:`~asynctest.CoroutineMock` object instead of
     a class:`~asynctest.Mock` object where a method on a ``spec`` or
     ``spec_set`` object is a coroutine.
 
+    If you want to mock a coroutine function, use :class:`CoroutineMock`
+    instead.
+
     see :class:`~asynctest.Mock`.
     """
-    def _mock_add_spec(self, *args, **kwargs):
-        return _mock_add_spec(self, *args, **kwargs)
-
-    def _get_child_mock(self, *args, **kwargs):
-        return _get_child_mock(self, *args, **kwargs)
 
 
 class CoroutineMock(Mock):
@@ -405,7 +396,6 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     see :func:`unittest.mock.patch()`.
     """
-
     getter, attribute = unittest.mock._get_target(target)
     patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
                      new_callable, kwargs)
@@ -482,8 +472,6 @@ patch.TEST_PREFIX = unittest.mock.patch.TEST_PREFIX
 
 sentinel = unittest.mock.sentinel
 call = unittest.mock.call
-create_autospec = unittest.mock.create_autospec
-# TODO create_autospec: call the original method and recreate the object
 PropertyMock = unittest.mock.PropertyMock
 
 
