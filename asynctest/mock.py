@@ -187,7 +187,7 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     For instance:
 
     >>> class Foo:
-    ...     @asyncio.couroutine
+    ...     @asyncio.coroutine
     ...     def foo(self):
     ...         pass
     ...
