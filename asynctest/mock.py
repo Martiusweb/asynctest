@@ -180,7 +180,7 @@ class NonCallableMagicMock(unittest.mock.NonCallableMagicMock,
 class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.Mock` so it returns
-    a class:`~asynctest.CoroutineMock` object instead of
+    a :class:`~asynctest.CoroutineMock` object instead of
     a :class:`~asynctest.Mock` object where a method on a ``spec`` or
     ``spec_set`` object is a coroutine.
 
