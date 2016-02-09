@@ -38,18 +38,18 @@ class FakeInheritanceMeta(type):
         new = type(cls.__name__, (cls, ), {'__doc__': cls.__doc__})
         return object.__new__(new)
 
-    def __instancecheck__(self, obj):
+    def __instancecheck__(cls, obj):
         # That's tricky, each type(mock) is actually a subclass of the actual
         # Mock type (see __new__)
         if super().__instancecheck__(obj):
             return True
 
         _type = type(obj)
-        if issubclass(self, NonCallableMock):
+        if issubclass(cls, NonCallableMock):
             if issubclass(_type, (NonCallableMagicMock, Mock, )):
                 return True
 
-        if issubclass(self, Mock) and not issubclass(self, CoroutineMock):
+        if issubclass(cls, Mock) and not issubclass(cls, CoroutineMock):
             if issubclass(_type, (MagicMock, )):
                 return True
 
