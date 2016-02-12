@@ -6,11 +6,15 @@ Mock objects
 Wrapper to unittest.mock reducing the boilerplate when testing asyncio powered
 code.
 
-A mock can behave as a coroutine, as specified in the documentation of Mock.
+A mock can behave as a coroutine, as specified in the documentation of
+:class:`~asynctest.mock.Mock`.
 """
 
 import asyncio
+import asyncio.coroutines
+import contextlib
 import functools
+import inspect
 import sys
 import types
 import unittest.mock
@@ -325,6 +329,38 @@ def _update_new_callable(patcher, new, new_callable):
     return patcher
 
 
+class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
+    # Inheriting from asyncio.CoroWrapper gives us a comprehensive wrapper
+    # implementing one or more workarounds for cpython bugs
+    def __init__(self, gen, patchings, is_coroutine):
+        self.gen = gen
+        self._is_coroutine = is_coroutine
+        self.__name__ = getattr(gen, '__name__', None)
+        self.__qualname__ = getattr(gen, '__qualname__', None)
+        self.patchings = patchings
+
+    def __repr__(self):
+        return repr(self.generator)
+
+    def __next__(self):
+        with contextlib.ExitStack() as stack:
+            [stack.enter_context(patching) for patching in self.patchings]
+            return self.gen.send(None)
+
+    def send(self, value):
+        with contextlib.ExitStack() as stack:
+            [stack.enter_context(patching) for patching in self.patchings]
+            return super().send(value)
+
+    def throw(self, exc):
+        with contextlib.ExitStack() as stack:
+            [stack.enter_context(patching) for patching in self.patchings]
+            return self.gen.throw(exc)
+
+    def __del__(self):
+        pass
+
+
 class _patch(unittest.mock._patch):
     def copy(self):
         patcher = _patch(
@@ -343,11 +379,12 @@ class _patch(unittest.mock._patch):
             func.patchings.append(self)
             return func
 
-        if not asyncio.iscoroutinefunction(func):
+        is_generator_func = inspect.isgeneratorfunction(func)
+        is_coroutine_func = asyncio.iscoroutinefunction(func)
+        if not (is_generator_func or is_coroutine_func):
             return super().decorate_callable(func)
 
         @functools.wraps(func)
-        @asyncio.coroutine
         def patched(*args, **keywargs):
             extra_args = []
             entered_patchers = []
@@ -359,11 +396,16 @@ class _patch(unittest.mock._patch):
                     entered_patchers.append(patching)
                     if patching.attribute_name is not None:
                         keywargs.update(arg)
+                        if patching.new is DEFAULT:
+                            patching.new = arg[patching.attribute_name]
                     elif patching.new is DEFAULT:
+                        patching.new = arg
                         extra_args.append(arg)
 
                 args += tuple(extra_args)
-                return (yield from func(*args, **keywargs))
+                gen = func(*args, **keywargs)
+                return _PatchedGenerator(gen, patched.patchings,
+                                         asyncio.iscoroutinefunction(func))
             except:
                 if patching not in entered_patchers and unittest.mock._is_started(patching):
                     # the patcher may have been started, but an exception
@@ -378,7 +420,20 @@ class _patch(unittest.mock._patch):
                     patching.__exit__(*exc_info)
 
         patched.patchings = [self]
-        return patched
+
+        if is_generator_func:
+            # wrap the patched object in a generator so
+            # inspect.isgeneratorfunction() returns True
+            @functools.wraps(func)
+            def patched_generator(*args, **kwargs):
+                return (yield from patched(*args, **kwargs))
+
+            if is_coroutine_func:
+                return asyncio.coroutine(patched_generator)
+            else:
+                return patched_generator
+        else:
+            return functools.wraps(func)(patched)
 
 
 def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
@@ -392,9 +447,34 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     object.
 
     It is a replacement to :func:`unittest.mock.patch`, but using
-    :module:`asynctest.mock` objects.
+    :mod:`asynctest.mock` objects.
+
+    When a generator or a coroutine is patched using the decorator, the patch
+    is active during its execution. However, when the generator or coroutine
+    is paused (``yield`` or ``await``), the patch is deactivated. Hence, the
+    behavior differs from :func:`unittest.mock.patch` for generators.
+
+    When used as a context manager, the patch is still active even if the
+    generator or coroutine is paused, which may affect concurrent tasks::
+
+        @asyncio.coroutine
+        def coro():
+            with asynctest.mock.patch("module.function"):
+                yield from asyncio.get_event_loop().sleep(1)
+
+        @asyncio.coroutine
+        def independent_coro():
+            assert not isinstance(module.function, asynctest.mock.Mock)
+
+        asyncio.create_task(coro())
+        asyncio.create_task(independent_coro())
+        # this will raise an AssertionError(coro() is scheduled first)!
+        loop.run_forever()
 
     see :func:`unittest.mock.patch()`.
+
+    .. versionadded:: 0.5 patch into generators and coroutines with
+                      a decorator.
     """
     getter, attribute = unittest.mock._get_target(target)
     patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
