@@ -473,7 +473,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     see :func:`unittest.mock.patch()`.
 
-    .. versionadded:: 0.5 patch into generators and coroutines with
+    .. versionadded:: 0.6 patch into generators and coroutines with
                       a decorator.
     """
     getter, attribute = unittest.mock._get_target(target)
