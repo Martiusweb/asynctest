@@ -50,6 +50,8 @@ Mock and CoroutineMock
   - patch(), patch.object(), patch.multiple() return a MagickMock or
     CoroutineMock object by default, according to the patched target,
 
+  - patch(), patch.object(), patch.multiple() handle generators and coroutines,
+
   - all the patch() methods can decorate coroutine functions,
 
   - mock_open() returns a MagickMock object by default.
@@ -90,8 +92,8 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
-- set of warnings against common mistakes (0.6 ?)
-- proactor support (0.7 ?)
+- set of warnings against common mistakes (0.7 ?)
+- proactor support (0.8 ?)
 
 Tests
 -----
