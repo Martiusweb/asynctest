@@ -33,6 +33,29 @@ from unittest.case import *  # NOQA
 import asynctest.selector
 
 
+class _Policy(asyncio.AbstractEventLoopPolicy):
+    def __init__(self, original_policy, loop, forbid_get_event_loop):
+        self.original_policy = original_policy
+        self.forbid_get_event_loop = forbid_get_event_loop
+        self.loop = loop
+
+    def get_event_loop(self):
+        if self.forbid_get_event_loop:
+            raise AssertionError("TestCase.forbid_get_event_loop is True, "
+                                 "asyncio.get_event_loop() must not be called")
+        elif self.loop:
+            return self.loop
+        else:
+            return self.original_policy.get_event_loop()
+
+    def new_event_loop(self):
+        return self.original_policy.new_event_loop()
+
+    def set_event_loop(self, loop):
+        self.original_policy.set_event_loop(loop)
+        self.loop = loop
+
+
 class TestCase(unittest.case.TestCase):
     """
     if :meth:`setUp()` and :meth:`tearDown()` are coroutine functions, they
@@ -48,22 +71,27 @@ class TestCase(unittest.case.TestCase):
     function or :class:`~asynctest.TestCase` class can be decorated with
     :func:`~asynctest.ignore_loop`.
 
-    By default, a new loop is created and is set as the default loop before each
-    test. Test authors can retrieve this loop with
+    By default, a new loop is created and is set as the default loop before
+    each test. Test authors can retrieve this loop with
     :attr:`~asynctest.TestCase.loop`.
 
-    If :attr:`~asynctest.TestCase.use_default_loop` is set to True, the current
-    default event loop is used instead. In this case, it is up to the test
-    author to deal with the state of the loop in each test: the loop might be
-    closed, callbacks and tasks may be scheduled by previous tests. It is also
-    up to the test author to close the loop and dispose the related resources.
+    If :attr:`~asynctest.TestCase.use_default_loop` is set to ``True``, the
+    current default event loop is used instead. In this case, it is up to the
+    test author to deal with the state of the loop in each test: the loop might
+    be closed, callbacks and tasks may be scheduled by previous tests. It is
+    also up to the test author to close the loop and dispose the related
+    resources.
 
-    This behavior should be configured when defining the test case class:
+    If :attr:`~asynctest.TestCase.forbid_get_event_loop` is set to ``True``,
+    a call to :func:`asyncio.get_event_loop()` will raise an
+    :exc:`AssertionError`.
 
-    ::
+    These behaviors should be configured when defining the test case class::
 
         class With_Reusable_Loop_TestCase(asynctest.TestCase):
             use_default_loop = True
+
+            forbid_get_event_loop = False
 
             def test_something(self):
                 pass
@@ -73,11 +101,21 @@ class TestCase(unittest.case.TestCase):
 
         attribute :attr:`~asynctest.TestCase.use_default_loop`.
 
+    .. versionadded:: 0.7
+
+        attribute :attr:`~asynctest.TestCase.forbid_get_event_loop`.
+        In any case, the default loop is now reset to its original state
+        outside a test function.
     """
     #: If true, the loop used by the test case is the current default event
     #: loop returned by :func:`asyncio.get_event_loop()`. The loop will not be
     #: closed and recreated between tests.
     use_default_loop = False
+
+    #: If true, the value returned by :func:`asyncio.get_event_loop()` will be
+    #: set to ``None`` during the test. It allows to ensure that tested code
+    #: use a loop object explicitely passed around.
+    forbid_get_event_loop = False
 
     #: Event loop created and set as default event loop during the test.
     loop = None
@@ -85,16 +123,23 @@ class TestCase(unittest.case.TestCase):
     def _init_loop(self):
         if self.use_default_loop:
             self.loop = asyncio.get_event_loop()
+            loop = None
         else:
-            self.loop = asyncio.new_event_loop()
+            loop = self.loop = asyncio.new_event_loop()
+
+        policy = _Policy(asyncio.get_event_loop_policy(),
+                         loop, self.forbid_get_event_loop)
+
+        asyncio.set_event_loop_policy(policy)
 
         self.loop = self._patch_loop(self.loop)
-        asyncio.set_event_loop(self.loop)
 
     def _unset_loop(self):
         if not self.use_default_loop:
             self.loop.close()
 
+        policy = asyncio.get_event_loop_policy()
+        asyncio.set_event_loop_policy(policy.original_policy)
         self.loop = None
 
     def _patch_loop(self, loop):
