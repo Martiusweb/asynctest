@@ -10,7 +10,7 @@ from setuptools import setup
 
 args = {
     "name": "asynctest",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Enhance the standard unittest package with features for "
                    "testing asyncio libraries",
     "author": "Martin Richard",

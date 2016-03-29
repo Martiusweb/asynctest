@@ -28,12 +28,15 @@ Features
 TestCase and FunctionTestCase
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  - Initialize and close a loop created for each test, if the loop uses
-    a selector, it will be updated with a TestSelector object wrapping the
-    original selector (see below),
+  - Initialize and close a loop created for each test (it can be
+    configurated), if the loop uses a selector, it will be updated with
+    a TestSelector object wrapping the original selector (see below),
+
   - if the test function is a coroutine function or returns a coroutine, it
     will run on the loop,
+
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
+
   - a test fails if the loop did not run during the test.
 
 
@@ -92,8 +95,8 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
-- set of warnings against common mistakes (0.7 ?)
-- proactor support (0.8 ?)
+- set of warnings against common mistakes
+- proactor support
 
 Tests
 -----
