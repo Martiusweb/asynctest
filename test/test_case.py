@@ -41,7 +41,15 @@ class Test:
 class Test_TestCase(unittest.TestCase):
     run_methods = ('run', 'debug', )
 
+    def create_default_loop(self):
+        default_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(default_loop)
+        self.addCleanup(default_loop.close)
+        return default_loop
+
     def test_init_and_close_loop_for_test(self):
+        default_loop = self.create_default_loop()
+
         @asynctest.ignore_loop
         class LoopTest(asynctest.TestCase):
             failing = False
@@ -73,12 +81,44 @@ class Test_TestCase(unittest.TestCase):
                 mock.assert_called_with()
                 mock_loop.close.assert_called_with()
                 self.assertFalse(case.failing)
+                self.assertIs(default_loop, asyncio.get_event_loop())
 
-    def create_default_loop(self):
-        default_loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(default_loop)
-        self.addCleanup(default_loop.close)
-        return default_loop
+    def test_default_loop_is_not_created_when_unused(self):
+        policy = asyncio.get_event_loop_policy()
+
+        @asynctest.ignore_loop
+        class Dummy_TestCase(Test.FooTestCase):
+            pass
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                with unittest.mock.patch.object(policy,
+                                                "get_event_loop") as mock:
+                    case = Dummy_TestCase()
+                    getattr(case, method)()
+
+                self.assertFalse(mock.called)
+
+    def test_update_default_loop_works(self):
+        a_loop = asyncio.new_event_loop()
+        self.addCleanup(a_loop.close)
+
+        class Update_Default_Loop_TestCase(asynctest.TestCase):
+            @asynctest.ignore_loop
+            def runTest(self):
+                self.assertIs(self.loop, asyncio.get_event_loop())
+                asyncio.set_event_loop(a_loop)
+                self.assertIs(a_loop, asyncio.get_event_loop())
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = Update_Default_Loop_TestCase()
+                result = getattr(case, method)()
+
+                if result:
+                    self.assertTrue(result.wasSuccessful())
+
+                self.assertIs(a_loop, asyncio.get_event_loop())
 
     def test_use_default_loop(self):
         default_loop = self.create_default_loop()
@@ -95,10 +135,35 @@ class Test_TestCase(unittest.TestCase):
                 case = Using_Default_Loop_TestCase()
                 result = getattr(case, method)()
 
+                # assert that the original loop is reset after the test
+                self.assertIs(default_loop, asyncio.get_event_loop())
+
                 if result:
                     self.assertTrue(result.wasSuccessful())
 
             self.assertFalse(default_loop.is_closed())
+
+    def test_forbid_get_event_loop(self):
+        default_loop = self.create_default_loop()
+
+        class Forbid_get_event_loop_TestCase(asynctest.TestCase):
+            forbid_get_event_loop = True
+
+            @asyncio.coroutine
+            def runTest(self):
+                with self.assertRaises(AssertionError):
+                    asyncio.get_event_loop()
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = Forbid_get_event_loop_TestCase()
+                result = getattr(case, method)()
+
+                # assert that the original loop is reset after the test
+                self.assertIs(default_loop, asyncio.get_event_loop())
+
+                if result:
+                    self.assertTrue(result.wasSuccessful())
 
     def test_coroutinefunction_executed(self):
         class CoroutineFunctionTest(asynctest.TestCase):
