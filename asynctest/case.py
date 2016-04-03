@@ -55,6 +55,12 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
         self.original_policy.set_event_loop(loop)
         self.loop = loop
 
+    def get_child_watcher(self):
+        return self.original_policy.get_child_watcher()
+
+    def set_child_watcher(self, watcher):
+        return self.original_policy.set_child_watcher(watcher)
+
 
 class TestCase(unittest.case.TestCase):
     """
