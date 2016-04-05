@@ -2,8 +2,10 @@
 
 import asyncio
 import itertools
+import os
 import unittest
 import unittest.mock
+import subprocess
 import sys
 
 import asynctest
@@ -37,8 +39,28 @@ class Test:
         def tearDown(self):
             self.events.append('tearDown')
 
+    class StartWaitProcessTestCase(asynctest.TestCase):
+        @staticmethod
+        @asyncio.coroutine
+        def start_wait_process(loop):
+            process = yield from asyncio.create_subprocess_shell(
+                "true", stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                loop=loop)
 
-class Test_TestCase(unittest.TestCase):
+            try:
+                out, err = yield from asyncio.wait_for(
+                    process.communicate(), timeout=.1, loop=loop)
+            except:
+                process.kill()
+                os.waitpid(process.pid, os.WNOHANG)
+                raise
+
+        @asyncio.coroutine
+        def runTest(self):
+            yield from self.start_wait_process(self.loop)
+
+
+class _TestCase(unittest.TestCase):
     run_methods = ('run', 'debug', )
 
     def create_default_loop(self):
@@ -47,6 +69,8 @@ class Test_TestCase(unittest.TestCase):
         self.addCleanup(default_loop.close)
         return default_loop
 
+
+class Test_TestCase(_TestCase):
     def test_init_and_close_loop_for_test(self):
         default_loop = self.create_default_loop()
 
@@ -388,6 +412,38 @@ class Test_TestCase(unittest.TestCase):
 
                 if outcome:
                     self.assertTrue(outcome.wasSuccessful())
+
+
+@unittest.skipIf(sys.platform == "win32", "Tests specific to Unix")
+class Test_TestCase_and_ChildWatcher(_TestCase):
+    def test_watched_process_is_awaited(self):
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                case = Test.StartWaitProcessTestCase()
+                outcome = getattr(case, method)()
+
+                if outcome:
+                    self.assertTrue(outcome.wasSuccessful())
+
+    def test_original_watcher_works_outside_loop(self):
+        default_loop = self.create_default_loop()
+
+        # check if we can spawn and wait a subprocess before an after a test
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                coro = Test.StartWaitProcessTestCase.start_wait_process(
+                    default_loop)
+                default_loop.run_until_complete(coro)
+
+                case = Test.StartWaitProcessTestCase()
+                outcome = getattr(case, method)()
+
+                if outcome:
+                    self.assertTrue(outcome.wasSuccessful())
+
+                coro = Test.StartWaitProcessTestCase.start_wait_process(
+                    default_loop)
+                default_loop.run_until_complete(coro)
 
 
 if __name__ == "__main__":

@@ -38,7 +38,12 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
         self.original_policy = original_policy
         self.forbid_get_event_loop = forbid_get_event_loop
         self.loop = loop
+        self.watcher = None
 
+    # we override the loop from the original policy because we don't want to
+    # instanciate a "default loop" that may be never closed (usually, we only
+    # run the test, so the "original default loop" is not even created by the
+    # policy).
     def get_event_loop(self):
         if self.forbid_get_event_loop:
             raise AssertionError("TestCase.forbid_get_event_loop is True, "
@@ -52,8 +57,41 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
         return self.original_policy.new_event_loop()
 
     def set_event_loop(self, loop):
-        self.original_policy.set_event_loop(loop)
+        result = self.original_policy.set_event_loop(loop)
         self.loop = loop
+        return result
+
+    def _check_unix(self):
+        if not hasattr(asyncio, "SafeChildWatcher"):
+            raise NotImplementedError
+
+    def get_child_watcher(self):
+        self._check_unix()
+        if self.loop:
+            if self.watcher is None:
+                self.watcher = asyncio.SafeChildWatcher()
+                self.watcher.attach_loop(self.loop)
+
+            return self.watcher
+        else:
+            return self.original_policy.get_child_watcher()
+
+    def set_child_watcher(self, watcher):
+        self._check_unix()
+        if self.loop:
+            result = self.original_policy.set_child_watcher(watcher)
+            self.watcher = watcher
+            return result
+        else:
+            return self.original_policy.set_child_watcher(watcher)
+
+    def reset_watcher(self):
+        if self.watcher:
+            self.watcher.close()
+            # force the original policy to reissue a child watcher next time
+            # get_child_watcher() is called, which effectively attach the loop
+            # to the new watcher. That's the best we can do so far
+            self.original_policy.set_child_watcher(None)
 
 
 class TestCase(unittest.case.TestCase):
@@ -135,10 +173,12 @@ class TestCase(unittest.case.TestCase):
         self.loop = self._patch_loop(self.loop)
 
     def _unset_loop(self):
+        policy = asyncio.get_event_loop_policy()
+
         if not self.use_default_loop:
             self.loop.close()
+            policy.reset_watcher()
 
-        policy = asyncio.get_event_loop_policy()
         asyncio.set_event_loop_policy(policy.original_policy)
         self.loop = None
 
