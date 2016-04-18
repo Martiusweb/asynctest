@@ -407,6 +407,19 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
             a_new_style_coroutine = patch_is_patched()(a_new_style_coroutine)
             run_coroutine(tester(a_new_style_coroutine))
 
+    def test_patched_coroutine_with_mock_args(self):
+        @asynctest.mock.patch('test.test_mock.Test', side_effect=lambda: None)
+        @asyncio.coroutine
+        def a_coroutine(mock):
+            loop = asyncio.get_event_loop()
+            self.assertIs(mock, Test)
+            yield from asyncio.sleep(0, loop=loop)
+            self.assertIs(mock, Test)
+            yield from asyncio.sleep(0, loop=loop)
+            self.assertIs(mock, Test)
+
+        run_coroutine(a_coroutine())
+
     def test_generator_arg_is_default_mock(self):
         @asynctest.mock.patch('test.test_mock.Test')
         def a_generator(mock):

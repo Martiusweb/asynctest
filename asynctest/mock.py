@@ -362,6 +362,10 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
 
 
 class _patch(unittest.mock._patch):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mock_to_reuse = None
+
     def copy(self):
         patcher = _patch(
             self.getter, self.attribute, self.new, self.spec,
@@ -373,6 +377,19 @@ class _patch(unittest.mock._patch):
             p.copy() for p in self.additional_patchers
         ]
         return patcher
+
+    def __enter__(self):
+        # When patching a coroutine, we reuse the same mock mock object
+        if self.mock_to_reuse is not None:
+            self.target = self.getter()
+            self.temp_original, self.is_local = self.get_original()
+            setattr(self.target, self.attribute, self.mock_to_reuse)
+            if self.attribute_name is not None:
+                for patching in self.additional_patchers:
+                    patching.__enter__()
+            return self.mock_to_reuse
+        else:
+            return super().__enter__()
 
     def decorate_callable(self, func):
         if hasattr(func, 'patchings'):
@@ -399,7 +416,7 @@ class _patch(unittest.mock._patch):
                         if patching.new is DEFAULT:
                             patching.new = arg[patching.attribute_name]
                     elif patching.new is DEFAULT:
-                        patching.new = arg
+                        patching.mock_to_reuse = arg
                         extra_args.append(arg)
 
                 args += tuple(extra_args)
