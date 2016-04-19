@@ -13,6 +13,7 @@ A mock can behave as a coroutine, as specified in the documentation of
 import asyncio
 import asyncio.coroutines
 import contextlib
+import enum
 import functools
 import inspect
 import sys
@@ -329,6 +330,11 @@ def _update_new_callable(patcher, new, new_callable):
     return patcher
 
 
+PatchScope = enum.Enum('PatchScope', 'LIMITED GLOBAL')
+LIMITED = PatchScope.LIMITED
+GLOBAL = PatchScope.GLOBAL
+
+
 class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
     # Inheriting from asyncio.CoroWrapper gives us a comprehensive wrapper
     # implementing one or more workarounds for cpython bugs
@@ -339,39 +345,58 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
         self.__qualname__ = getattr(gen, '__qualname__', None)
         self.patchings = patchings
 
+        # GLOBAL patches have been started in the _patch/patched() wrapper
+
     def __repr__(self):
         return repr(self.generator)
 
     def __next__(self):
-        with contextlib.ExitStack() as stack:
-            [stack.enter_context(patching) for patching in self.patchings]
-            return self.gen.send(None)
+        try:
+            with contextlib.ExitStack() as stack:
+                [stack.enter_context(patching) for patching in self.patchings
+                    if patching.scope == LIMITED]
+                return self.gen.send(None)
+        except:
+            # the generator/coroutine terminated, stop the patchings
+            for patching in reversed(self.patchings):
+                if (patching.scope == GLOBAL and
+                        unittest.mock._is_started(patching)):
+                    patching.stop()
+            raise
 
     def send(self, value):
         with contextlib.ExitStack() as stack:
-            [stack.enter_context(patching) for patching in self.patchings]
+            [stack.enter_context(patching) for patching in self.patchings
+                if patching.scope == LIMITED]
             return super().send(value)
 
     def throw(self, exc):
         with contextlib.ExitStack() as stack:
-            [stack.enter_context(patching) for patching in self.patchings]
+            [stack.enter_context(patching) for patching in self.patchings
+                if patching.scope == LIMITED]
             return self.gen.throw(exc)
 
     def __del__(self):
-        pass
+        # The generator/coroutine is deleted before it terminated, we must
+        # still stop the patchings
+        for patching in reversed(self.patchings):
+            if (patching.scope == GLOBAL and
+                    unittest.mock._is_started(patching)):
+                patching.stop()
 
 
 class _patch(unittest.mock._patch):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, scope=GLOBAL, **kwargs):
         super().__init__(*args, **kwargs)
+        self.scope = scope
         self.mock_to_reuse = None
 
     def copy(self):
         patcher = _patch(
             self.getter, self.attribute, self.new, self.spec,
             self.create, self.spec_set,
-            self.autospec, self.new_callable, self.kwargs
-        )
+            self.autospec, self.new_callable, self.kwargs,
+            scope=self.scope)
         patcher.attribute_name = self.attribute_name
         patcher.additional_patchers = [
             p.copy() for p in self.additional_patchers
@@ -379,7 +404,7 @@ class _patch(unittest.mock._patch):
         return patcher
 
     def __enter__(self):
-        # When patching a coroutine, we reuse the same mock mock object
+        # When patching a coroutine, we reuse the same mock object
         if self.mock_to_reuse is not None:
             self.target = self.getter()
             self.temp_original, self.is_local = self.get_original()
@@ -404,13 +429,14 @@ class _patch(unittest.mock._patch):
         @functools.wraps(func)
         def patched(*args, **keywargs):
             extra_args = []
-            entered_patchers = []
+            patchers_to_exit = []
 
             exc_info = tuple()
             try:
                 for patching in patched.patchings:
                     arg = patching.__enter__()
-                    entered_patchers.append(patching)
+                    if patching.scope == LIMITED:
+                        patchers_to_exit.append(patching)
                     if patching.attribute_name is not None:
                         keywargs.update(arg)
                         if patching.new is DEFAULT:
@@ -424,16 +450,17 @@ class _patch(unittest.mock._patch):
                 return _PatchedGenerator(gen, patched.patchings,
                                          asyncio.iscoroutinefunction(func))
             except:
-                if patching not in entered_patchers and unittest.mock._is_started(patching):
+                if (patching not in patchers_to_exit and
+                        unittest.mock._is_started(patching)):
                     # the patcher may have been started, but an exception
                     # raised whilst entering one of its additional_patchers
-                    entered_patchers.append(patching)
+                    patchers_to_exit.append(patching)
                 # Pass the exception to __exit__
                 exc_info = sys.exc_info()
                 # re-raise the exception
                 raise
             finally:
-                for patching in reversed(entered_patchers):
+                for patching in reversed(patchers_to_exit):
                     patching.__exit__(*exc_info)
 
         patched.patchings = [self]
@@ -454,7 +481,7 @@ class _patch(unittest.mock._patch):
 
 
 def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
-          autospec=None, new_callable=None, **kwargs):
+          autospec=None, new_callable=None, scope=GLOBAL, **kwargs):
     """
     A context manager, function decorator or class decorator which patch the
     target with the value given by ther new argument.
@@ -495,21 +522,22 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     """
     getter, attribute = unittest.mock._get_target(target)
     patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
-                     new_callable, kwargs)
+                     new_callable, kwargs, scope=scope)
 
     return _update_new_callable(patcher, new, new_callable)
 
 
 def _patch_object(target, attribute, new=DEFAULT, spec=None, create=False,
-                  spec_set=None, autospec=None, new_callable=None, **kwargs):
+                  spec_set=None, autospec=None, new_callable=None,
+                  scope=GLOBAL, **kwargs):
     patcher = _patch(lambda: target, attribute, new, spec, create, spec_set,
-                     autospec, new_callable, kwargs)
+                     autospec, new_callable, kwargs, scope=scope)
 
     return _update_new_callable(patcher, new, new_callable)
 
 
 def _patch_multiple(target, spec=None, create=False, spec_set=None,
-                    autospec=None, new_callable=None, **kwargs):
+                    autospec=None, new_callable=None, scope=GLOBAL, **kwargs):
     if type(target) is str:
         def getter():
             return unittest.mock._importer(target)
@@ -524,12 +552,12 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
     items = list(kwargs.items())
     attribute, new = items[0]
     patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
-                     new_callable, {})
+                     new_callable, {}, scope=scope)
 
     patcher.attribute_name = attribute
     for attribute, new in items[1:]:
         this_patcher = _patch(getter, attribute, new, spec, create, spec_set,
-                              autospec, new_callable, {})
+                              autospec, new_callable, {}, scope=scope)
         this_patcher.attribute_name = attribute
         patcher.additional_patchers.append(this_patcher)
 
