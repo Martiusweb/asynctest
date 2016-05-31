@@ -172,6 +172,17 @@ class TestCase(unittest.case.TestCase):
 
         self.loop = self._patch_loop(self.loop)
 
+    @staticmethod
+    def _scheduled_handle_alive(handle):
+        cancelled_timer_handle = (
+            isinstance(scheduled_thing, asyncio.TimerHandle) and
+            scheduled_thing._cancelled)
+        return not cancelled_timer_handle
+
+    @property
+    def _live_handles(self):
+        return filter(self._scheduled_handle_alive, self.loop._scheduled)
+
     def _unset_loop(self):
         policy = asyncio.get_event_loop_policy()
 
@@ -179,8 +190,11 @@ class TestCase(unittest.case.TestCase):
             self.loop.close()
             policy.reset_watcher()
 
-        asyncio.set_event_loop_policy(policy.original_policy)
-        self.loop = None
+        try:
+            self.assertEqual(tuple(self._live_handles), ())
+        finally:
+            asyncio.set_event_loop_policy(policy.original_policy)
+            self.loop = None
 
     def _patch_loop(self, loop):
         if hasattr(loop, '__asynctest_ran'):
