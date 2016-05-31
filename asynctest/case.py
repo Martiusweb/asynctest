@@ -340,6 +340,26 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
 
 
+class ClockedTestCase(TestCase):
+    def setUp(self):
+        super().setUp()
+        self.loop.time = lambda: self.time
+        self.time = 0
+
+    def advance(self, seconds):
+        assert seconds >= 0
+        self._drain_loop()
+        self.time += seconds
+        self._drain_loop()
+
+    def _drain_loop(self):
+        while self.loop._ready or any(map(
+                lambda handle: handle._when <= self.time,
+                self.loop._scheduled)):
+            self.loop._run_once()
+            self.loop._TestCase__asynctest_ran = True
+
+
 def ignore_loop(test):
     """
     Ignore the error case where the loop did not run during the test.
