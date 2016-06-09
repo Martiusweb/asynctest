@@ -343,20 +343,20 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
 class ClockedTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self.loop.time = functools.wraps(self.loop.time)(lambda: self.time)
-        self.time = 0
+        self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
+        self._time = 0
 
     def advance(self, seconds):
         if seconds < 0:
             raise ValueError(
                 'Cannot go back in time ({} seconds)'.format(seconds))
         self._drain_loop()
-        self.time += seconds
+        self._time += seconds
         self._drain_loop()
 
     def _drain_loop(self):
         while self.loop._ready or any(map(
-                lambda handle: handle._when <= self.time,
+                lambda handle: handle._when <= self._time,
                 self.loop._scheduled)):
             self.loop._run_once()
             self.loop._TestCase__asynctest_ran = True
