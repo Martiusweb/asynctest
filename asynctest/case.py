@@ -347,7 +347,9 @@ class ClockedTestCase(TestCase):
         self.time = 0
 
     def advance(self, seconds):
-        assert seconds >= 0
+        if seconds < 0:
+            raise ValueError(
+                'Cannot go back in time ({} seconds)'.format(seconds))
         self._drain_loop()
         self.time += seconds
         self._drain_loop()
