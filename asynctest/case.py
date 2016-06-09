@@ -189,12 +189,8 @@ class TestCase(unittest.case.TestCase):
         if not self.use_default_loop:
             self.loop.close()
             policy.reset_watcher()
-
-        try:
-            self.assertEqual(tuple(self._live_handles), ())
-        finally:
-            asyncio.set_event_loop_policy(policy.original_policy)
-            self.loop = None
+        asyncio.set_event_loop_policy(policy.original_policy)
+        self.loop = None
 
     def _patch_loop(self, loop):
         if hasattr(loop, '__asynctest_ran'):
@@ -320,19 +316,27 @@ class TestCase(unittest.case.TestCase):
             function(*args, **kwargs)
 
     def _run_test_method(self, method):
+        fail_checks = self._get_fail_checks(method)
         # If the method is a coroutine or returns a coroutine, run it on the
         # loop
         result = method()
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
-            return
+        else:
+            if fail_checks['unused_loop']:
+                if not self.loop.__asynctest_ran:
+                    self.fail("Loop did not run during the test")
+            if fail_checks['active_handles']:
+                live_handles = tuple(self._live_handles)
+                if live_handles:
+                    self.fail('Loop contained unfinished work {}'.format(
+                        live_handles))
 
-        if (getattr(self.__class__, "__asynctest_ignore_loop__", False) or
-                getattr(method, "__asynctest_ignore_loop__", False)):
-            return
-
-        if not self.loop.__asynctest_ran:
-            self.fail("Loop did not run during the test")
+    def _get_fail_checks(self, method):
+        checks = _FAIL_DEFAULTS.copy()
+        checks.update(getattr(self, _FAIL_CHECK_ATTR, {}))
+        checks.update(getattr(method, _FAIL_CHECK_ATTR, {}))
+        return checks
 
     def addCleanup(self, function, *args, **kwargs):
         """
@@ -360,3 +364,27 @@ def ignore_loop(test):
     """
     test.__asynctest_ignore_loop__ = True
     return test
+
+
+_FAIL_DEFAULTS = {
+    'unused_loop': True,
+    'active_handles': False
+}
+_FAIL_CHECK_ATTR = '_fail_on_checks'
+
+
+def fail_on(**kwargs):
+    invalid_kwargs = {k for k in kwargs if k not in _FAIL_DEFAULTS}
+    if invalid_kwargs:
+        raise TypeError('Invalid keyword arguments {}'.format(invalid_kwargs))
+
+    def decorate(func_or_class):
+        opts = getattr(func_or_class, _FAIL_CHECK_ATTR, {})
+        opts.update(kwargs)
+        setattr(func_or_class, _FAIL_CHECK_ATTR, opts)
+        return func_or_class
+    return decorate
+
+
+def ignore_loop(test):
+    return fail_on(unused_loop=False)(test)
