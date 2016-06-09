@@ -343,7 +343,7 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
 class ClockedTestCase(TestCase):
     def setUp(self):
         super().setUp()
-        self.loop.time = lambda: self.time
+        self.loop.time = functools.wraps(self.loop.time)(lambda: self.time)
         self.time = 0
 
     def advance(self, seconds):
