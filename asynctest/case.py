@@ -355,14 +355,6 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
 
 
-def ignore_loop(test):
-    """
-    Ignore the error case where the loop did not run during the test.
-    """
-    test.__asynctest_ignore_loop__ = True
-    return test
-
-
 _FAIL_DEFAULTS = {
     'unused_loop': True,
     'active_handles': False
