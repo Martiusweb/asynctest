@@ -321,6 +321,18 @@ class Test_TestCase(_TestCase):
                 result = test().run()
                 self.assertEqual(0, len(result.failures))
 
+    def test_fails_when_future_has_scheduled_calls(self):
+        class CruftyTest(asynctest.TestCase):
+            @asynctest.fail_on(active_handles=True)
+            def test_scheduling_without_wait(instance):
+                asyncio.sleep(10, loop=instance.loop)
+
+        with self.subTest(test=CruftyTest):
+            with self.assertRaisesRegex(AssertionError, 'unfinished work'):
+                CruftyTest().debug()
+            result = CruftyTest().run()
+            self.assertEqual(1, len(result.failures))
+
     def test_setup_teardown_may_be_coroutines(self):
         @asynctest.ignore_loop
         class WithSetupFunction(Test.FooTestCase):
