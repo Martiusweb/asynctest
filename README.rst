@@ -14,6 +14,8 @@ Author & license
 Authored by Martin Richard <martius@martiusweb.net> and licensed under the
 Apache 2 license.
 
+See the AUTHORS file for a comprehensive list of the authors.
+
 Documentation
 -------------
 
@@ -25,8 +27,8 @@ Full documentation is available at http://asynctest.readthedocs.org/en/latest/,
 Features
 --------
 
-TestCase and FunctionTestCase
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TestCases
+~~~~~~~~~
 
   - Initialize and close a loop created for each test (it can be
     configurated), if the loop uses a selector, it will be updated with
@@ -37,7 +39,10 @@ TestCase and FunctionTestCase
 
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
 
-  - a test fails if the loop did not run during the test.
+  - a test fails if the loop did not run during the test,
+
+  - ClockedTestCase allows to control the loop clock and run timed events
+    without waiting the wall clock.
 
 
 Mock and CoroutineMock
