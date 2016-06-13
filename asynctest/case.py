@@ -322,15 +322,14 @@ class TestCase(unittest.case.TestCase):
         result = method()
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
-        else:
-            if fail_checks['unused_loop']:
-                if not self.loop.__asynctest_ran:
-                    self.fail("Loop did not run during the test")
-            if fail_checks['active_handles']:
-                live_handles = tuple(self._live_handles)
-                if live_handles:
-                    self.fail('Loop contained unfinished work {}'.format(
-                        live_handles))
+        elif fail_checks['unused_loop']:
+            if not self.loop.__asynctest_ran:
+                self.fail("Loop did not run during the test")
+        if fail_checks['active_handles']:
+            live_handles = tuple(self._live_handles)
+            if live_handles:
+                self.fail('Loop contained unfinished work {}'.format(
+                    live_handles))
 
     def _get_fail_checks(self, method):
         checks = _FAIL_DEFAULTS.copy()
