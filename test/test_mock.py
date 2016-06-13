@@ -250,21 +250,29 @@ for child, parent in TestMockInheritanceModel.to_test.items():
             'test_{}_inherits_from_{}'.format(child, parent),
             TestMockInheritanceModel.make_inheritance_test(child, parent))
 
+#
+# mock_open()
+#
+
 
 class Test_mock_open(unittest.TestCase):
     def test_MagicMock_returned_by_default(self):
         self.assertIsInstance(asynctest.mock_open(), asynctest.MagicMock)
 
+#
+# Test patches
+#
+
 
 class Test_patch(unittest.TestCase):
-    def test_patch_with_MagicMock(self):
+    def test_patch_as_context_manager_uses_MagicMock(self):
         with asynctest.mock.patch('test.test_mock.Test') as mock:
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
         with asynctest.mock.patch('test.test_mock.Test.a_function') as mock:
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
-    def test_patch_decorate_with_MagicMock(self):
+    def test_patch_as_decorator_uses_MagicMock(self):
         @asynctest.mock.patch('test.test_mock.Test')
         def test_mock_class(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
@@ -276,26 +284,32 @@ class Test_patch(unittest.TestCase):
         test_mock_class()
         test_mock_function()
 
-    def test_patch_decorate_coroutine_function_with_CoroutineMock(self):
+    def test_patch_as_decorator_uses_CoroutineMock_on_coroutine_function(self):
         @asynctest.mock.patch('test.test_mock.Test.a_coroutine')
         def test_mock_coroutine(mock):
             self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
         test_mock_coroutine()
 
+    def test_patch_as_context_manager_uses_CoroutineMock_on_coroutine_function(self):
+        with asynctest.mock.patch('test.test_mock.Test.a_coroutine'):
+            import test.test_mock
+            self.assertIsInstance(test.test_mock.Test.a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
     if _using_await:
-        def test_patch_async_coroutine_function_with_CoroutineMock(self):
+        def test_patch_as_context_manager_uses_CoroutineMock_on_async_coroutine_function(self):
             with asynctest.mock.patch('test.test_mock.Test.an_async_coroutine') as mock:
                 self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
-        def test_patch_decorate_async_coroutine_function_with_CoroutineMock(self):
+        def test_patch_as_decorator_uses_CoroutineMock_on__async_coroutine_function(self):
             @asynctest.mock.patch('test.test_mock.Test.an_async_coroutine')
             def test_mock_coroutine(mock):
                 self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
             test_mock_coroutine()
 
-    def test_patch_decorates_coroutine(self):
+    def test_patch_is_enabled_when_running_decorated_coroutine(self):
         @asyncio.coroutine
         def a_coroutine():
             import test.test_mock
@@ -309,7 +323,7 @@ class Test_patch(unittest.TestCase):
             with self.subTest(coroutine=coroutine):
                 self.assertTrue(run_coroutine(patch_is_patched()(coroutine)()))
 
-    def test_patch_decorates_function(self):
+    def test_patch_is_enabled_when_running_decorated_function(self):
         @patch_is_patched()
         def a_function():
             import test.test_mock
@@ -404,6 +418,123 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
             run_coroutine(tester(a_new_style_coroutine))
 
 
+class Test_patch_object(unittest.TestCase):
+    def test_patch_with_MagicMock(self):
+        with asynctest.mock.patch.object(Test(), 'a_function') as mock:
+            self.assertIsInstance(mock, asynctest.mock.MagicMock)
+
+        obj = Test()
+        obj.test = Test()
+        with asynctest.mock.patch.object(obj, 'test') as mock:
+            self.assertIsInstance(mock, asynctest.mock.MagicMock)
+
+    def test_patch_coroutine_function_with_CoroutineMock(self):
+        with asynctest.mock.patch.object(Test(), 'a_coroutine') as mock:
+            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+
+        if _using_await:
+            with asynctest.mock.patch.object(Test(), 'an_async_coroutine') as mock:
+                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+
+    def test_patch_decorates_coroutine(self):
+        obj = Test()
+
+        patch = functools.partial(asynctest.mock.patch.object,
+                                  obj, 'is_patched', new=lambda: True)
+
+        @asyncio.coroutine
+        def a_coroutine():
+            return obj.is_patched()
+
+        coroutines = [a_coroutine]
+        if _using_await:
+            coroutines.append(_using_await.transform(a_coroutine))
+
+        for coroutine in coroutines:
+            with self.subTest(coroutine=coroutine):
+                self.assertTrue(run_coroutine(patch()(coroutine)()))
+
+
+class Test_patch_multiple(unittest.TestCase):
+    def test_patch_with_MagicMock(self):
+        default = asynctest.mock.DEFAULT
+        with asynctest.mock.patch.multiple('test.test_mock', Test=default):
+            import test.test_mock
+            self.assertIsInstance(test.test_mock.Test, asynctest.mock.MagicMock)
+
+    def test_patch_coroutine_function_with_CoroutineMock(self):
+        default = asynctest.mock.DEFAULT
+
+        also_patch = {}
+        if _using_await:
+            also_patch['an_async_coroutine'] = default
+
+        with asynctest.mock.patch.multiple('test.test_mock.Test',
+                                           a_function=default,
+                                           a_coroutine=default,
+                                           **also_patch):
+            import test.test_mock
+            obj = test.test_mock.Test()
+            self.assertIsInstance(obj.a_function, asynctest.mock.MagicMock)
+            self.assertIsInstance(obj.a_coroutine, asynctest.mock.CoroutineMock)
+
+            if _using_await:
+                self.assertIsInstance(obj.an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
+
+    def test_patch_decorates_coroutine(self):
+        patch = functools.partial(asynctest.mock.patch.multiple,
+                                  'test.test_mock.Test',
+                                  is_patched=lambda self: True)
+
+        @asyncio.coroutine
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().is_patched()
+
+        coroutines = [a_coroutine]
+        if _using_await:
+            coroutines.append(_using_await.transform(a_coroutine))
+
+        for coroutine in coroutines:
+            with self.subTest(coroutine=coroutine):
+                self.assertTrue(run_coroutine(patch()(coroutine)()))
+
+
+class Test_patch_dict(unittest.TestCase):
+    def test_patch_decorates_coroutine(self):
+        patch = functools.partial(asynctest.mock.patch.dict,
+                                  'test.test_mock.Test.a_dict',
+                                  is_patched=True)
+
+        @asyncio.coroutine
+        def a_coroutine():
+            import test.test_mock
+            return test.test_mock.Test().a_dict['is_patched']
+
+        coroutines = [a_coroutine]
+
+        if _using_await:
+            coroutines.append(_using_await.transform(a_coroutine))
+
+        for coroutine in coroutines:
+            with self.subTest(coroutine=coroutine):
+                self.assertTrue(run_coroutine(patch()(coroutine)()))
+
+    def test_patch_decorates_function(self):
+        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        def a_function():
+            import test.test_mock
+            return test.test_mock.Test().a_dict['is_patched']
+
+        self.assertTrue(a_function())
+
+
+#
+# patch scopes
+#
+
+
 class patch_scope_TestCase(unittest.TestCase):
     def is_patched(self):
         import test.test_mock
@@ -413,7 +544,7 @@ class patch_scope_TestCase(unittest.TestCase):
         import test.test_mock
         return test.test_mock.Test().second_is_patched()
 
-    def _test_patch_generator_when_call_fails(self, scope):
+    def _test_deactivate_patch_when_generator_init_fails(self, scope):
         @patch_is_patched(scope=scope)
         def a_generator(wrong_number_of_args):
             yield
@@ -427,7 +558,7 @@ class patch_scope_TestCase(unittest.TestCase):
 
         self.assertFalse(self.is_patched())
 
-    def _test_patch_coroutine_when_call_fails(self, scope):
+    def _test_deactivate_patch_when_generator_exec_fails(self, scope):
         @patch_is_patched(scope=scope)
         @asyncio.coroutine
         def a_coroutine(missing_arg):
@@ -469,6 +600,7 @@ class patch_scope_TestCase(unittest.TestCase):
 
 
 class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
+    # Tests of patch() related to the use of scope=*, with several scopes used
     def test_default_scope_is_global(self):
         @patch_is_patched()
         def a_generator():
@@ -509,7 +641,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
             self.assertFalse(self.second_is_patched())
             self.assertEqual((True, True), next(gen))
 
-    def test_multiple_patches_on_coroutine(self):
+    def test_patch_coroutine_with_multiple_scopes(self):
         def set_fut_result(fut):
             fut.set_result((self.is_patched(), self.second_is_patched()))
 
@@ -570,11 +702,12 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
 
 
 class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestCase):
-    def test_patch_generator_when_call_fails(self):
-        self._test_patch_generator_when_call_fails(asynctest.GLOBAL)
+    # Tests of patch() using scope=GLOBAL
+    def test_deactivate_patch_when_generator_init_fails(self):
+        self._test_deactivate_patch_when_generator_init_fails(asynctest.GLOBAL)
 
-    def test_patch_coroutine_when_call_fails(self):
-        self._test_patch_coroutine_when_call_fails(asynctest.GLOBAL)
+    def test_deactivate_patch_when_generator_exec_fails(self):
+        self._test_deactivate_patch_when_generator_exec_fails(asynctest.GLOBAL)
 
     def test_patch_generator_during_its_lifetime(self):
         @patch_is_patched(scope=asynctest.GLOBAL)
@@ -705,11 +838,12 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
 
 
 class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_TestCase):
-    def test_patch_generator_when_call_fails(self):
-        self._test_patch_generator_when_call_fails(asynctest.LIMITED)
+    # Tests of patch() using scope=LIMITED
+    def test_deactivate_patch_when_generator_init_fails(self):
+        self._test_deactivate_patch_when_generator_init_fails(asynctest.LIMITED)
 
-    def test_patch_coroutine_when_call_fails(self):
-        self._test_patch_coroutine_when_call_fails(asynctest.LIMITED)
+    def test_deactivate_patch_when_generator_exec_fails(self):
+        self._test_deactivate_patch_when_generator_exec_fails(asynctest.LIMITED)
 
     def test_patch_generator_only_when_running(self):
         @patch_is_patched(scope=asynctest.LIMITED)
@@ -808,117 +942,6 @@ class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_Test
             a_new_style_coroutine = patch_is_patched(scope=asynctest.LIMITED)(
                 a_new_style_coroutine)
             run_coroutine(tester(a_new_style_coroutine))
-
-
-class Test_patch_object(unittest.TestCase):
-    def test_patch_with_MagicMock(self):
-        with asynctest.mock.patch.object(Test(), 'a_function') as mock:
-            self.assertIsInstance(mock, asynctest.mock.MagicMock)
-
-        obj = Test()
-        obj.test = Test()
-        with asynctest.mock.patch.object(obj, 'test') as mock:
-            self.assertIsInstance(mock, asynctest.mock.MagicMock)
-
-    def test_patch_coroutine_function_with_CoroutineMock(self):
-        with asynctest.mock.patch.object(Test(), 'a_coroutine') as mock:
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
-
-        if _using_await:
-            with asynctest.mock.patch.object(Test(), 'an_async_coroutine') as mock:
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
-
-    def test_patch_decorates_coroutine(self):
-        obj = Test()
-
-        patch = functools.partial(asynctest.mock.patch.object,
-                                  obj, 'is_patched', new=lambda: True)
-
-        @asyncio.coroutine
-        def a_coroutine():
-            return obj.is_patched()
-
-        coroutines = [a_coroutine]
-        if _using_await:
-            coroutines.append(_using_await.transform(a_coroutine))
-
-        for coroutine in coroutines:
-            with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
-
-
-class Test_patch_multiple(unittest.TestCase):
-    def test_patch_with_MagicMock(self):
-        default = asynctest.mock.DEFAULT
-        with asynctest.mock.patch.multiple('test.test_mock', Test=default):
-            import test.test_mock
-            self.assertIsInstance(test.test_mock.Test, asynctest.mock.MagicMock)
-
-    def test_patch_coroutine_function_with_CoroutineMock(self):
-        default = asynctest.mock.DEFAULT
-
-        also_patch = {}
-        if _using_await:
-            also_patch['an_async_coroutine'] = default
-
-        with asynctest.mock.patch.multiple('test.test_mock.Test',
-                                           a_function=default,
-                                           a_coroutine=default,
-                                           **also_patch):
-            import test.test_mock
-            obj = test.test_mock.Test()
-            self.assertIsInstance(obj.a_function, asynctest.mock.MagicMock)
-            self.assertIsInstance(obj.a_coroutine, asynctest.mock.CoroutineMock)
-
-            if _using_await:
-                self.assertIsInstance(obj.an_async_coroutine, asynctest.mock.CoroutineMock)
-
-    def test_patch_decorates_coroutine(self):
-        patch = functools.partial(asynctest.mock.patch.multiple,
-                                  'test.test_mock.Test',
-                                  is_patched=lambda self: True)
-
-        @asyncio.coroutine
-        def a_coroutine():
-            import test.test_mock
-            return test.test_mock.Test().is_patched()
-
-        coroutines = [a_coroutine]
-        if _using_await:
-            coroutines.append(_using_await.transform(a_coroutine))
-
-        for coroutine in coroutines:
-            with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
-
-
-class Test_patch_dict(unittest.TestCase):
-    def test_patch_decorates_coroutine(self):
-        patch = functools.partial(asynctest.mock.patch.dict,
-                                  'test.test_mock.Test.a_dict',
-                                  is_patched=True)
-
-        @asyncio.coroutine
-        def a_coroutine():
-            import test.test_mock
-            return test.test_mock.Test().a_dict['is_patched']
-
-        coroutines = [a_coroutine]
-
-        if _using_await:
-            coroutines.append(_using_await.transform(a_coroutine))
-
-        for coroutine in coroutines:
-            with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
-
-    def test_patch_decorates_function(self):
-        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
-        def a_function():
-            import test.test_mock
-            return test.test_mock.Test().a_dict['is_patched']
-
-        self.assertTrue(a_function())
 
 
 class Test_return_once(unittest.TestCase):
