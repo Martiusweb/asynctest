@@ -451,11 +451,17 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
     @asyncio.coroutine
     def test_advance(self):
         f = asyncio.Future(loop=self.loop)
+        g = asyncio.Future(loop=self.loop)
         started_wall_clock = time.monotonic()
         started_loop_clock = self.loop.time()
         self.loop.call_later(1, f.set_result, None)
+        self.loop.call_later(2, g.set_result, None)
+        self.assertFalse(f.done())
         yield from self.advance(1)
         yield from f
+        self.assertFalse(g.done())
+        yield from self.advance(9)
+        yield from g
         finished_wall_clock = time.monotonic()
         finished_loop_clock = self.loop.time()
         self.assertLess(
