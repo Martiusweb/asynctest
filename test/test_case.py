@@ -323,9 +323,9 @@ class Test_TestCase(_TestCase):
 
     def test_fails_when_future_has_scheduled_calls(self):
         class CruftyTest(asynctest.TestCase):
-            @asynctest.fail_on(active_handles=True)
-            def test_scheduling_without_wait(instance):
-                asyncio.sleep(10, loop=instance.loop)
+            @asynctest.fail_on(active_handles=True, unused_loop=False)
+            def runTest(instance):
+                instance.loop.call_later(5, lambda: None)
 
         with self.subTest(test=CruftyTest):
             with self.assertRaisesRegex(AssertionError, 'unfinished work'):
