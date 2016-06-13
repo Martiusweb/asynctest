@@ -173,15 +173,13 @@ class TestCase(unittest.case.TestCase):
         self.loop = self._patch_loop(self.loop)
 
     @staticmethod
-    def _scheduled_handle_alive(handle):
-        cancelled_timer_handle = (
-            isinstance(scheduled_thing, asyncio.TimerHandle) and
-            scheduled_thing._cancelled)
-        return not cancelled_timer_handle
+    def _is_live_timer_handle(handle):
+        return (
+            isinstance(handle, asyncio.TimerHandle) and not handle._cancelled)
 
     @property
-    def _live_handles(self):
-        return filter(self._scheduled_handle_alive, self.loop._scheduled)
+    def _live_timer_handles(self):
+        return filter(self._is_live_timer_handle, self.loop._scheduled)
 
     def _unset_loop(self):
         policy = asyncio.get_event_loop_policy()
@@ -326,7 +324,7 @@ class TestCase(unittest.case.TestCase):
             if not self.loop.__asynctest_ran:
                 self.fail("Loop did not run during the test")
         if fail_checks['active_handles']:
-            live_handles = tuple(self._live_handles)
+            live_handles = tuple(self._live_timer_handles)
             if live_handles:
                 self.fail('Loop contained unfinished work {}'.format(
                     live_handles))
