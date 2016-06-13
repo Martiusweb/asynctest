@@ -2,6 +2,7 @@
 
 import asyncio
 import itertools
+import logging
 import os
 import unittest
 import unittest.mock
@@ -449,6 +450,19 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
 
 class Test_ClockedTestCase(asynctest.ClockedTestCase):
     @asyncio.coroutine
+    def advance(self, seconds):
+        try:
+            self.loop.set_debug(True)
+            with self.assertLogs(level=logging.WARNING) as log:
+                yield from self.loop.create_task(super().advance(seconds))
+
+            self.assertTrue(any(filter(
+                lambda o: 'took {:.3f} seconds'.format(seconds) in o,
+                log.output)))
+        finally:
+            self.loop.set_debug(False)
+
+    @asyncio.coroutine
     def test_advance(self):
         f = asyncio.Future(loop=self.loop)
         g = asyncio.Future(loop=self.loop)
@@ -462,6 +476,19 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.assertFalse(g.done())
         yield from self.advance(9)
         yield from g
+        finished_wall_clock = time.monotonic()
+        finished_loop_clock = self.loop.time()
+        self.assertLess(
+            finished_wall_clock - started_wall_clock,
+            finished_loop_clock - started_loop_clock)
+
+    def test_advance_with_run_until_complete(self):
+        f = asyncio.Future(loop=self.loop)
+        started_wall_clock = time.monotonic()
+        started_loop_clock = self.loop.time()
+        self.loop.call_later(1, f.set_result, None)
+        self.loop.run_until_complete(self.advance(1))
+        self.assertTrue(f.done())
         finished_wall_clock = time.monotonic()
         finished_loop_clock = self.loop.time()
         self.assertLess(
