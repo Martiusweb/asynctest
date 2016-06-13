@@ -462,6 +462,12 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
             finished_wall_clock - started_wall_clock,
             finished_loop_clock - started_loop_clock)
 
+    @asyncio.coroutine
+    def test_negative_advance(self):
+        with self.assertRaisesRegex(ValueError, 'back in time'):
+            yield from self.advance(-1)
+        self.assertEqual(self.loop.time(), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
