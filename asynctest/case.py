@@ -346,6 +346,7 @@ class ClockedTestCase(TestCase):
         self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
         self._time = 0
 
+    @asyncio.coroutine
     def advance(self, seconds):
         if seconds < 0:
             raise ValueError(
@@ -358,7 +359,7 @@ class ClockedTestCase(TestCase):
         while self.loop._ready or any(map(
                 lambda handle: handle._when <= self._time,
                 self.loop._scheduled)):
-            self.loop._run_once()
+            yield from asyncio.sleep(0)
             self.loop._TestCase__asynctest_ran = True
 
 

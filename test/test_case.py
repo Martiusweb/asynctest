@@ -448,13 +448,14 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
 
 
 class Test_ClockedTestCase(asynctest.ClockedTestCase):
+    @asyncio.coroutine
     def test_advance(self):
         f = asyncio.Future(loop=self.loop)
         started_wall_clock = time.monotonic()
         started_loop_clock = self.loop.time()
         self.loop.call_later(1, f.set_result, None)
-        self.advance(1)
-        self.loop.run_until_complete(f)
+        yield from self.advance(1)
+        yield from f
         finished_wall_clock = time.monotonic()
         finished_loop_clock = self.loop.time()
         self.assertLess(
