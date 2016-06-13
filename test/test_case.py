@@ -7,6 +7,7 @@ import unittest
 import unittest.mock
 import subprocess
 import sys
+import time
 
 import asynctest
 
@@ -444,6 +445,34 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
                 coro = Test.StartWaitProcessTestCase.start_wait_process(
                     default_loop)
                 default_loop.run_until_complete(coro)
+
+
+class Test_ClockedTestCase(asynctest.ClockedTestCase):
+    @asyncio.coroutine
+    def test_advance(self):
+        f = asyncio.Future(loop=self.loop)
+        g = asyncio.Future(loop=self.loop)
+        started_wall_clock = time.monotonic()
+        started_loop_clock = self.loop.time()
+        self.loop.call_later(1, f.set_result, None)
+        self.loop.call_later(2, g.set_result, None)
+        self.assertFalse(f.done())
+        yield from self.advance(1)
+        yield from f
+        self.assertFalse(g.done())
+        yield from self.advance(9)
+        yield from g
+        finished_wall_clock = time.monotonic()
+        finished_loop_clock = self.loop.time()
+        self.assertLess(
+            finished_wall_clock - started_wall_clock,
+            finished_loop_clock - started_loop_clock)
+
+    @asyncio.coroutine
+    def test_negative_advance(self):
+        with self.assertRaisesRegex(ValueError, 'back in time'):
+            yield from self.advance(-1)
+        self.assertEqual(self.loop.time(), 0)
 
 
 if __name__ == "__main__":

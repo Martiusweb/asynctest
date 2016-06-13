@@ -4,8 +4,8 @@
        :maxdepth: 2
 
 
-    TestCase and FunctionTestCase
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    TestCases
+    ~~~~~~~~~
 
     .. autoclass:: asynctest.TestCase
         :members:
@@ -29,6 +29,10 @@
         :members:
         :undoc-members:
 
+    .. autoclass:: asynctest.ClockedTestCase
+        :members:
+        :undoc-members:
+        :exclude-members: setUp
 
     Decorators
     ~~~~~~~~~~

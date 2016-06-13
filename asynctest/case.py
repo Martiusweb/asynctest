@@ -340,6 +340,34 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
 
 
+class ClockedTestCase(TestCase):
+    '''Subclass of :class:`~asynctest.TestCase` with tester controlled time...
+
+    useful for testing timer based behaviour without slowing test run time.'''
+
+    def setUp(self):
+        super().setUp()
+        self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
+        self._time = 0
+
+    @asyncio.coroutine
+    def advance(self, seconds):
+        '''Fast forward time by a number of seconds'''
+        if seconds < 0:
+            raise ValueError(
+                'Cannot go back in time ({} seconds)'.format(seconds))
+        self._drain_loop()
+        self._time += seconds
+        self._drain_loop()
+
+    def _drain_loop(self):
+        while self.loop._ready or any(map(
+                lambda handle: handle._when <= self._time,
+                self.loop._scheduled)):
+            yield from asyncio.sleep(0)
+            self.loop._TestCase__asynctest_ran = True
+
+
 def ignore_loop(test):
     """
     Ignore the error case where the loop did not run during the test.
