@@ -11,7 +11,11 @@ can simulate the behavior of a selector on the mock objects, or forward actual
 work to a real selector.
 """
 
-import selectors
+try:
+    import selectors
+except ImportError:
+    import selectors34 as selectors
+
 import socket
 import ssl
 
