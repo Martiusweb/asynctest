@@ -341,10 +341,10 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
 
 
 class ClockedTestCase(TestCase):
-    '''Subclass of :class:`~asynctest.TestCase` with tester controlled time...
-
-    useful for testing timer based behaviour without slowing test run time.'''
-
+    """
+    Subclass of :class:`~asynctest.TestCase` with a controlled loop clock,
+    useful for testing timer based behaviour without slowing test run time.
+    """
     def setUp(self):
         super().setUp()
         self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
@@ -352,7 +352,12 @@ class ClockedTestCase(TestCase):
 
     @asyncio.coroutine
     def advance(self, seconds):
-        '''Fast forward time by a number of seconds'''
+        """
+        Fast forward time by a number of ``seconds``.
+
+        Callbacks scheduled to run up to the destination clock time will be
+        executed.
+        """
         if seconds < 0:
             raise ValueError(
                 'Cannot go back in time ({} seconds)'.format(seconds))
