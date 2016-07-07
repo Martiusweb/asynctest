@@ -361,10 +361,12 @@ class ClockedTestCase(TestCase):
         if seconds < 0:
             raise ValueError(
                 'Cannot go back in time ({} seconds)'.format(seconds))
-        self._drain_loop()
-        self._time += seconds
-        self._drain_loop()
 
+        yield from self._drain_loop()
+        self._time += seconds
+        yield from self._drain_loop()
+
+    @asyncio.coroutine
     def _drain_loop(self):
         while self.loop._ready or any(map(
                 lambda handle: handle._when <= self._time,

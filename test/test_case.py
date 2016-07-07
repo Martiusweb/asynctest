@@ -472,10 +472,10 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.loop.call_later(2, g.set_result, None)
         self.assertFalse(f.done())
         yield from self.advance(1)
-        yield from f
+        self.assertTrue(f.done())
         self.assertFalse(g.done())
         yield from self.advance(9)
-        yield from g
+        self.assertTrue(g)
         finished_wall_clock = time.monotonic()
         finished_loop_clock = self.loop.time()
         self.assertLess(
