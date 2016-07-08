@@ -356,21 +356,50 @@ class ClockedTestCase(TestCase):
         Fast forward time by a number of ``seconds``.
 
         Callbacks scheduled to run up to the destination clock time will be
-        executed.
+        executed on time::
+
+        >>> self.loop.call_later(1, print_time)
+        >>> self.loop.call_later(2, self.loop.call_later, 1, print_time)
+        >>> await self.advance(3)
+        ... 1
+        ... 3
+
+        In this example, the third callback is scheduled at ``t = 2`` to be
+        executed at ``t + 1``. Hence, it will run at ``t = 3``. The callback as
+        been called on time.
         """
         if seconds < 0:
             raise ValueError(
                 'Cannot go back in time ({} seconds)'.format(seconds))
 
         yield from self._drain_loop()
-        self._time += seconds
+
+        target_time = self._time + seconds
+        while True:
+            next_time = self._next_scheduled()
+            if next_time is None or next_time > target_time:
+                break
+
+            self._time = next_time
+            yield from self._drain_loop()
+
+        self._time = target_time
         yield from self._drain_loop()
+
+    def _next_scheduled(self):
+        try:
+            return self.loop._scheduled[0]._when
+        except IndexError:
+            return None
 
     @asyncio.coroutine
     def _drain_loop(self):
-        while self.loop._ready or any(map(
-                lambda handle: handle._when <= self._time,
-                self.loop._scheduled)):
+        while True:
+            next_time = self._next_scheduled()
+            if not self.loop._ready and (next_time is None or
+                                         next_time > self._time):
+                break
+
             yield from asyncio.sleep(0)
             self.loop._TestCase__asynctest_ran = True
 

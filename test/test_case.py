@@ -4,11 +4,12 @@ import asyncio
 import itertools
 import logging
 import os
-import unittest
-import unittest.mock
+import re
 import subprocess
 import sys
 import time
+import unittest
+import unittest.mock
 
 import asynctest
 
@@ -449,6 +450,8 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
 
 
 class Test_ClockedTestCase(asynctest.ClockedTestCase):
+    took_n_seconds = re.compile('took \d+\.\d{3} seconds')
+
     @asyncio.coroutine
     def advance(self, seconds):
         try:
@@ -456,9 +459,8 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
             with self.assertLogs(level=logging.WARNING) as log:
                 yield from self.loop.create_task(super().advance(seconds))
 
-            self.assertTrue(any(filter(
-                lambda o: 'took {:.3f} seconds'.format(seconds) in o,
-                log.output)))
+            self.assertTrue(any(filter(self.took_n_seconds.search,
+                                       log.output)))
         finally:
             self.loop.set_debug(False)
 
@@ -500,6 +502,23 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         with self.assertRaisesRegex(ValueError, 'back in time'):
             yield from self.advance(-1)
         self.assertEqual(self.loop.time(), 0)
+
+    @asyncio.coroutine
+    def test_callbacks_are_called_on_time(self):
+        def record(call_time):
+            call_time.append(self.loop.time())
+
+        call_time = []
+        self.loop.call_later(0, record, call_time)
+        self.loop.call_later(1, record, call_time)
+        self.loop.call_later(2, record, call_time)
+        self.loop.call_later(5, record, call_time)
+        yield from self.advance(3)
+        expected = list(range(3))
+        self.assertEqual(call_time, expected)
+        yield from self.advance(2)
+        expected.append(5)
+        self.assertEqual(call_time, expected)
 
 
 if __name__ == "__main__":
