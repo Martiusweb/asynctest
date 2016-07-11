@@ -11,7 +11,12 @@ can simulate the behavior of a selector on the mock objects, or forward actual
 work to a real selector.
 """
 
-import selectors
+try:
+    import selectors
+except ImportError:
+    # In the case of Python 3.3, attempt to use the selectors
+    # modules from within the asyncio package
+    import asyncio.selectors as selectors
 import socket
 import ssl
 
