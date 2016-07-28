@@ -572,6 +572,16 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
 
 
 class _patch_dict(unittest.mock._patch_dict):
+    def decorate_class(self, klass):
+        for attr in dir(klass):
+            attr_value = getattr(klass, attr)
+            if (attr.startswith(patch.TEST_PREFIX) and
+                    hasattr(attr_value, "__call__")):
+                decorator = _patch_dict(self.in_dict, self.values, self.clear)
+                decorated = decorator(attr_value)
+                setattr(klass, attr, decorated)
+        return klass
+
     def __call__(self, f):
         if not asyncio.iscoroutinefunction(f):
             return super().__call__(f)

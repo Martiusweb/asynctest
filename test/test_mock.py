@@ -529,6 +529,22 @@ class Test_patch_dict(unittest.TestCase):
 
         self.assertTrue(a_function())
 
+    def test_patch_decorates_class(self):
+        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        class Patched:
+            @asyncio.coroutine
+            def test_a_coroutine(self):
+                import test.test_mock
+                return test.test_mock.Test().a_dict['is_patched']
+
+            def test_a_function(self):
+                import test.test_mock
+                return test.test_mock.Test().a_dict['is_patched']
+
+        instance = Patched()
+        self.assertTrue(instance.test_a_function())
+        self.assertTrue(run_coroutine(instance.test_a_coroutine()))
+
 
 #
 # patch scopes
