@@ -51,6 +51,10 @@ patch_second_is_patched = functools.partial(
     asynctest.mock.patch, 'test.test_mock.Test.second_is_patched',
     new=lambda self: True)
 
+patch_dict_is_patched = functools.partial(
+    asynctest.mock.patch.dict, 'test.test_mock.Test.a_dict',
+    values={"is_patched": True})
+
 
 def inject_class(obj):
     # Decorate _Test_* mixin classes so we can retrieve the mock class to test
@@ -503,10 +507,6 @@ class Test_patch_multiple(unittest.TestCase):
 
 class Test_patch_dict(unittest.TestCase):
     def test_patch_decorates_coroutine(self):
-        patch = functools.partial(asynctest.mock.patch.dict,
-                                  'test.test_mock.Test.a_dict',
-                                  is_patched=True)
-
         @asyncio.coroutine
         def a_coroutine():
             import test.test_mock
@@ -519,10 +519,10 @@ class Test_patch_dict(unittest.TestCase):
 
         for coroutine in coroutines:
             with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
+                self.assertTrue(run_coroutine(patch_dict_is_patched()(coroutine)()))
 
     def test_patch_decorates_function(self):
-        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        @patch_dict_is_patched()
         def a_function():
             import test.test_mock
             return test.test_mock.Test().a_dict['is_patched']
@@ -530,7 +530,7 @@ class Test_patch_dict(unittest.TestCase):
         self.assertTrue(a_function())
 
     def test_patch_decorates_class(self):
-        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        @patch_dict_is_patched()
         class Patched:
             @asyncio.coroutine
             def test_a_coroutine(self):
