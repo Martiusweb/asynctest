@@ -472,6 +472,8 @@ class _patch(unittest.mock._patch):
             def patched_generator(*args, **kwargs):
                 return (yield from patched(*args, **kwargs))
 
+            patched_generator.patchings = patched.patchings
+
             if is_coroutine_func:
                 return asyncio.coroutine(patched_generator)
             else:
@@ -572,6 +574,10 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
 
 
 class _patch_dict(unittest.mock._patch_dict):
+    def __init__(self, in_dict, values=(), clear=False, scope=GLOBAL, **kwargs):
+        super().__init__(in_dict, values, clear, **kwargs)
+        self.scope = scope
+
     def decorate_class(self, klass):
         for attr in dir(klass):
             attr_value = getattr(klass, attr)
@@ -582,16 +588,18 @@ class _patch_dict(unittest.mock._patch_dict):
                 setattr(klass, attr, decorated)
         return klass
 
-    def __call__(self, f):
-        if not asyncio.iscoroutinefunction(f):
-            return super().__call__(f)
+    def __call__(self, func):
+        is_generator_func = inspect.isgeneratorfunction(func)
+        is_coroutine_func = asyncio.iscoroutinefunction(func)
+        if not (is_generator_func or is_coroutine_func):
+            return super().__call__(func)
 
-        @functools.wraps(f)
+        @functools.wraps(func)
         @asyncio.coroutine
         def _inner(*args, **kw):
             self._patch_dict()
             try:
-                return (yield from f(*args, **kw))
+                return (yield from func(*args, **kw))
             finally:
                 self._unpatch_dict()
 
