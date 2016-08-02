@@ -182,10 +182,9 @@ def set_write_ready(fileobj, loop):
     data can be written to ``fileobj``.
 
     :param fileobj: file obkect or  :class:`~asynctest.FileMock` on which th
-    event is mocked.
-
+        event is mocked.
     :param loop: :class:`asyncio.SelectorEventLoop` watching for events on
-    ``fileobj``.
+        ``fileobj``.
 
     .. versionadded:: 0.4
     """

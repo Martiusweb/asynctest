@@ -58,7 +58,8 @@ Mock and CoroutineMock
   - patch(), patch.object(), patch.multiple() return a MagickMock or
     CoroutineMock object by default, according to the patched target,
 
-  - patch(), patch.object(), patch.multiple() handle generators and coroutines,
+  - patch(), patch.object(), patch.multiple() handle generators and coroutines
+    and their behavior can be controled when the generator or coroutine pauses,
 
   - all the patch() methods can decorate coroutine functions,
 

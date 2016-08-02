@@ -356,13 +356,13 @@ class ClockedTestCase(TestCase):
         Fast forward time by a number of ``seconds``.
 
         Callbacks scheduled to run up to the destination clock time will be
-        executed on time::
+        executed on time:
 
         >>> self.loop.call_later(1, print_time)
         >>> self.loop.call_later(2, self.loop.call_later, 1, print_time)
         >>> await self.advance(3)
-        ... 1
-        ... 3
+        1
+        3
 
         In this example, the third callback is scheduled at ``t = 2`` to be
         executed at ``t + 1``. Hence, it will run at ``t = 3``. The callback as
