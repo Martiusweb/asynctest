@@ -338,7 +338,13 @@ def _update_new_callable(patcher, new, new_callable):
 
 
 PatchScope = enum.Enum('PatchScope', 'LIMITED GLOBAL')
+
+#: Value of ``scope``, deactivating a patch when a decorated generator or
+#: a coroutine pauses (``yield`` or ``await``).
 LIMITED = PatchScope.LIMITED
+
+#: Value of ``scope``, activating a patch until the decorated generator or
+#: coroutine returns or raises an exception.
 GLOBAL = PatchScope.GLOBAL
 
 
@@ -517,9 +523,17 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     :mod:`asynctest.mock` objects.
 
     When a generator or a coroutine is patched using the decorator, the patch
-    is active during its execution. However, when the generator or coroutine
-    is paused (``yield`` or ``await``), the patch is deactivated. Hence, the
-    behavior differs from :func:`unittest.mock.patch` for generators.
+    is activated or deactivated according to the ``scope`` argument value:
+
+      * :const:`asynctest.GLOBAL`: the default, enables the patch until the
+        generator or the coroutine finishes (returns or raises an exception),
+
+      * :const:`asynctest.LIMITED`: the patch will be activated when the
+        generator or coroutine is being executed, and deactivated when it
+        yields a value and pauses its execution (with ``yield``, ``yield from``
+        or ``await``).
+
+    The behavior differs from :func:`unittest.mock.patch` for generators.
 
     When used as a context manager, the patch is still active even if the
     generator or coroutine is paused, which may affect concurrent tasks::
@@ -537,6 +551,9 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
         asyncio.create_task(independent_coro())
         # this will raise an AssertionError(coro() is scheduled first)!
         loop.run_forever()
+
+    :param scope: :const:`asynctest.GLOBAL` or :const:`asynctest.LIMITED`,
+        controls when the patch is activated on generators and coroutines
 
     see :func:`unittest.mock.patch()`.
 
@@ -595,6 +612,7 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
 
 
 class _patch_dict(unittest.mock._patch_dict):
+    # documentation is in doc/asynctest.mock.rst
     def __init__(self, in_dict, values=(), clear=False, scope=GLOBAL,
                  **kwargs):
         super().__init__(in_dict, values, clear, **kwargs)
