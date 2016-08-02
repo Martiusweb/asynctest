@@ -25,6 +25,13 @@ def _raise(exception):
     raise exception
 
 
+def _is_started(patching):
+    if isinstance(patching, _patch_dict):
+        return patching._is_started
+    else:
+        return unittest.mock._is_started(patching)
+
+
 class FakeInheritanceMeta(type):
     """
     A metaclass which recreates the original inheritance model from
@@ -335,6 +342,80 @@ LIMITED = PatchScope.LIMITED
 GLOBAL = PatchScope.GLOBAL
 
 
+def _decorate_callable(func, new_patching):
+    if hasattr(func, 'patchings'):
+        func.patchings.append(new_patching)
+        return func
+
+    is_generator_func = inspect.isgeneratorfunction(func)
+    is_coroutine_func = asyncio.iscoroutinefunction(func)
+    if not (is_generator_func or is_coroutine_func):
+        return None
+
+    @functools.wraps(func)
+    def patched(*args, **keywargs):
+        extra_args = []
+        patchers_to_exit = []
+        patch_dict_with_limited_scope = []
+
+        exc_info = tuple()
+        try:
+            for patching in patched.patchings:
+                arg = patching.__enter__()
+                if patching.scope == LIMITED:
+                    patchers_to_exit.append(patching)
+                if isinstance(patching, _patch_dict):
+                    if patching.scope == GLOBAL:
+                        for limited_patching in patch_dict_with_limited_scope:
+                            if limited_patching.in_dict is patching.in_dict:
+                                limited_patching._keep_global_patch(patching)
+                    else:
+                        patch_dict_with_limited_scope.append(patching)
+                else:
+                    if patching.attribute_name is not None:
+                        keywargs.update(arg)
+                        if patching.new is DEFAULT:
+                            patching.new = arg[patching.attribute_name]
+                    elif patching.new is DEFAULT:
+                        patching.mock_to_reuse = arg
+                        extra_args.append(arg)
+
+            args += tuple(extra_args)
+            gen = func(*args, **keywargs)
+            return _PatchedGenerator(gen, patched.patchings,
+                                     asyncio.iscoroutinefunction(func))
+        except:
+            if patching not in patchers_to_exit and _is_started(patching):
+                # the patcher may have been started, but an exception
+                # raised whilst entering one of its additional_patchers
+                patchers_to_exit.append(patching)
+            # Pass the exception to __exit__
+            exc_info = sys.exc_info()
+            # re-raise the exception
+            raise
+        finally:
+            for patching in reversed(patchers_to_exit):
+                patching.__exit__(*exc_info)
+
+    patched.patchings = [new_patching]
+
+    if is_generator_func:
+        # wrap the patched object in a generator so
+        # inspect.isgeneratorfunction() returns True
+        @functools.wraps(func)
+        def patched_generator(*args, **kwargs):
+            return (yield from patched(*args, **kwargs))
+
+        patched_generator.patchings = patched.patchings
+
+        if is_coroutine_func:
+            return asyncio.coroutine(patched_generator)
+        else:
+            return patched_generator
+    else:
+        return functools.wraps(func)(patched)
+
+
 class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
     # Inheriting from asyncio.CoroWrapper gives us a comprehensive wrapper
     # implementing one or more workarounds for cpython bugs
@@ -359,8 +440,7 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
         except:
             # the generator/coroutine terminated, stop the patchings
             for patching in reversed(self.patchings):
-                if (patching.scope == GLOBAL and
-                        unittest.mock._is_started(patching)):
+                if patching.scope == GLOBAL and _is_started(patching):
                     patching.stop()
             raise
 
@@ -380,8 +460,7 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
         # The generator/coroutine is deleted before it terminated, we must
         # still stop the patchings
         for patching in reversed(self.patchings):
-            if (patching.scope == GLOBAL and
-                    unittest.mock._is_started(patching)):
+            if patching.scope == GLOBAL and _is_started(patching):
                 patching.stop()
 
 
@@ -417,69 +496,11 @@ class _patch(unittest.mock._patch):
             return super().__enter__()
 
     def decorate_callable(self, func):
-        if hasattr(func, 'patchings'):
-            func.patchings.append(self)
-            return func
-
-        is_generator_func = inspect.isgeneratorfunction(func)
-        is_coroutine_func = asyncio.iscoroutinefunction(func)
-        if not (is_generator_func or is_coroutine_func):
+        wrapped = _decorate_callable(func, self)
+        if wrapped is None:
             return super().decorate_callable(func)
-
-        @functools.wraps(func)
-        def patched(*args, **keywargs):
-            extra_args = []
-            patchers_to_exit = []
-
-            exc_info = tuple()
-            try:
-                for patching in patched.patchings:
-                    arg = patching.__enter__()
-                    if patching.scope == LIMITED:
-                        patchers_to_exit.append(patching)
-                    if patching.attribute_name is not None:
-                        keywargs.update(arg)
-                        if patching.new is DEFAULT:
-                            patching.new = arg[patching.attribute_name]
-                    elif patching.new is DEFAULT:
-                        patching.mock_to_reuse = arg
-                        extra_args.append(arg)
-
-                args += tuple(extra_args)
-                gen = func(*args, **keywargs)
-                return _PatchedGenerator(gen, patched.patchings,
-                                         asyncio.iscoroutinefunction(func))
-            except:
-                if (patching not in patchers_to_exit and
-                        unittest.mock._is_started(patching)):
-                    # the patcher may have been started, but an exception
-                    # raised whilst entering one of its additional_patchers
-                    patchers_to_exit.append(patching)
-                # Pass the exception to __exit__
-                exc_info = sys.exc_info()
-                # re-raise the exception
-                raise
-            finally:
-                for patching in reversed(patchers_to_exit):
-                    patching.__exit__(*exc_info)
-
-        patched.patchings = [self]
-
-        if is_generator_func:
-            # wrap the patched object in a generator so
-            # inspect.isgeneratorfunction() returns True
-            @functools.wraps(func)
-            def patched_generator(*args, **kwargs):
-                return (yield from patched(*args, **kwargs))
-
-            patched_generator.patchings = patched.patchings
-
-            if is_coroutine_func:
-                return asyncio.coroutine(patched_generator)
-            else:
-                return patched_generator
         else:
-            return functools.wraps(func)(patched)
+            return wrapped
 
 
 def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
@@ -574,9 +595,15 @@ def _patch_multiple(target, spec=None, create=False, spec_set=None,
 
 
 class _patch_dict(unittest.mock._patch_dict):
-    def __init__(self, in_dict, values=(), clear=False, scope=GLOBAL, **kwargs):
+    def __init__(self, in_dict, values=(), clear=False, scope=GLOBAL,
+                 **kwargs):
         super().__init__(in_dict, values, clear, **kwargs)
         self.scope = scope
+        self._is_started = False
+        self._global_patchings = []
+
+    def _keep_global_patch(self, other_patching):
+        self._global_patchings.append(other_patching)
 
     def decorate_class(self, klass):
         for attr in dir(klass):
@@ -589,22 +616,65 @@ class _patch_dict(unittest.mock._patch_dict):
         return klass
 
     def __call__(self, func):
-        is_generator_func = inspect.isgeneratorfunction(func)
-        is_coroutine_func = asyncio.iscoroutinefunction(func)
-        if not (is_generator_func or is_coroutine_func):
+        if isinstance(func, type):
+            return self.decorate_class(func)
+
+        wrapper = _decorate_callable(func, self)
+        if wrapper is None:
             return super().__call__(func)
+        else:
+            return wrapper
 
-        @functools.wraps(func)
-        @asyncio.coroutine
-        def _inner(*args, **kw):
-            self._patch_dict()
+    def _patch_dict(self):
+        self._is_started = True
+
+        try:
+            self._original = self.in_dict.copy()
+        except AttributeError:
+            # dict like object with no copy method
+            # must support iteration over keys
+            self._original = {}
+            for key in self.in_dict:
+                self._original[key] = self.in_dict[key]
+
+        if self.clear:
+            _clear_dict(self.in_dict)
+
+        try:
+            self.in_dict.update(self.values)
+        except AttributeError:
+            # dict like object with no update method
+            for key in self.values:
+                self.in_dict[key] = self.values[key]
+
+    def _unpatch_dict(self):
+        self._is_started = False
+
+        if self.scope == LIMITED:
+            # add to self.values the updated values which where not in
+            # the original dict, as the patch may be reactivated
+            for key in self.in_dict:
+                if (key not in self._original or
+                        self._original[key] is not self.in_dict[key]):
+                    self.values[key] = self.in_dict[key]
+
+        _clear_dict(self.in_dict)
+
+        originals = [self._original]
+        for patching in self._global_patchings:
+            if patching._is_started:
+                # keep the values of global patches
+                originals.append(patching.values)
+
+        for original in originals:
             try:
-                return (yield from func(*args, **kw))
-            finally:
-                self._unpatch_dict()
+                self.in_dict.update(original)
+            except AttributeError:
+                for key in original:
+                    self.in_dict[key] = original[key]
 
-        return _inner
 
+_clear_dict = unittest.mock._clear_dict
 
 patch.object = _patch_object
 patch.dict = _patch_dict
