@@ -231,7 +231,8 @@ class Test_TestCase(_TestCase):
                         self.assertTrue(case.ran)
 
     def test_fails_when_loop_didnt_run(self):
-        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
             Test.FooTestCase().debug()
 
         result = Test.FooTestCase().run()
@@ -243,7 +244,8 @@ class Test_TestCase(_TestCase):
 
         default_loop = self.create_default_loop()
 
-        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
             TestCase().debug()
 
         result = TestCase().run()
@@ -251,7 +253,8 @@ class Test_TestCase(_TestCase):
 
         default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
 
-        with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
             TestCase().debug()
 
         default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
@@ -519,6 +522,191 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         yield from self.advance(2)
         expected.append(5)
         self.assertEqual(call_time, expected)
+
+
+@unittest.mock.patch.dict("asynctest.case.FAIL_ON_DEFAULTS",
+                          values={"foo": False, "bar": True},
+                          clear=True)
+class Test_fail_on_decorator(unittest.TestCase):
+    def checks(self, obj, fatal=True):
+        if isinstance(obj, asynctest.TestCase):
+            case = obj
+        else:
+            case = obj.__self__
+
+        try:
+            return getattr(obj, asynctest.case._FAIL_ON_ATTR).get_checks(case)
+        except AttributeError:
+            if fatal:
+                self.fail("{!r} not decorated".format(obj))
+
+    def assert_not_decorated(self, obj):
+        if self.checks(obj, False) is not None:
+            self.fail("{!r} is decorated".format(obj))
+
+    def assert_checks_equal(self, obj, **kwargs):
+        self.assertEqual(self.checks(obj), kwargs)
+
+    def assert_checks(self, obj, **kwargs):
+        checks = self.checks(obj)
+        for check in kwargs:
+            if kwargs[check] != checks[check]:
+                self.fail("check '{}' {} (expected: {})".format(
+                    check,
+                    "enabled" if checks[check] else "disabled",
+                    "enabled" if kwargs[check] else "disabled")
+                )
+
+    def test_check_arguments(self):
+        message = "got an unexpected keyword argument 'not_existing'"
+        with self.assertRaisesRegex(TypeError, message):
+            asynctest.fail_on(foo=True, not_existing=True)
+
+    def test_decorate_method(self):
+        class TestCase(asynctest.TestCase):
+            @asynctest.fail_on(foo=True)
+            def test_foo(self):
+                pass
+
+        instance = TestCase()
+        self.assert_checks_equal(instance.test_foo, foo=True, bar=True)
+
+    def test_decorate_class(self):
+        @asynctest.fail_on(foo=True)
+        class TestCase(asynctest.TestCase):
+            def test_foo(self):
+                pass
+
+            @asynctest.fail_on(bar=False)
+            def test_bar(self):
+                pass
+
+            @asynctest.fail_on(foo=False, bar=False)
+            def test_baz(self):
+                pass
+
+        instance = TestCase()
+        with self.subTest("class is decorated"):
+            self.assert_checks_equal(instance, foo=True, bar=True)
+
+        with self.subTest("method without decoration is not decorated"):
+            self.assert_not_decorated(instance.test_foo)
+
+        with self.subTest("method decorated inherits of class params"):
+            self.assert_checks_equal(instance.test_bar, foo=True, bar=False)
+
+        with self.subTest("method decorated overrides class params"):
+            self.assert_checks_equal(instance.test_baz, foo=False, bar=False)
+
+    def test_decorate_subclass_doesnt_affect_base_class(self):
+        class TestCase(asynctest.TestCase):
+            pass
+
+        @asynctest.fail_on(foo=True)
+        class SubTestCase(TestCase):
+            pass
+
+        self.assert_not_decorated(TestCase())
+        self.assert_checks(SubTestCase(), foo=True)
+
+    def test_decorate_subclass_inherits_parent_params(self):
+        @asynctest.fail_on(foo=True)
+        class TestCase(asynctest.TestCase):
+            pass
+
+        @asynctest.fail_on(bar=False)
+        class SubTestCase(TestCase):
+            pass
+
+        @asynctest.fail_on(foo=False, bar=False)
+        class OverridingTestCase(TestCase):
+            pass
+
+        self.assert_checks_equal(TestCase(), foo=True, bar=True)
+        self.assert_checks_equal(SubTestCase(), foo=True, bar=False)
+        self.assert_checks_equal(OverridingTestCase(), foo=False, bar=False)
+
+    def test_strict_decorator(self):
+        @asynctest.strict
+        class TestCase(asynctest.TestCase):
+            pass
+
+        self.assert_checks_equal(TestCase(), foo=True, bar=True)
+
+        @asynctest.strict()
+        class TestCase(asynctest.TestCase):
+            pass
+
+        self.assert_checks_equal(TestCase(), foo=True, bar=True)
+
+
+fail_on_defaults = {"default": True, "optional": False}
+
+
+@unittest.mock.patch.dict("asynctest.case.FAIL_ON_DEFAULTS",
+                          values=fail_on_defaults, clear=True)
+class Test_fail_on(_TestCase):
+    def setUp(self):
+        self.mocks = {}
+        for method in fail_on_defaults:
+            mock = self.mocks[method] = unittest.mock.Mock()
+            setattr(asynctest.case._fail_on, method, mock)
+
+        self.addCleanup(lambda: [delattr(asynctest.case._fail_on, method)
+                                 for method in fail_on_defaults])
+
+    def tearDown(self):
+        self.mocks.clear()
+
+    def assert_checked(self, *args):
+        for check in args:
+            if not self.mocks[check].called:
+                self.fail("'{}' unexpectedly unchecked".format(check))
+
+    def assert_not_checked(self, *args):
+        for check in args:
+            if self.mocks[check].called:
+                self.fail("'{}' unexpectedly checked".format(check))
+
+    def test_default_checks(self):
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(Test.FooTestCase(), method)()
+
+                self.assert_checked("default")
+                self.assert_not_checked("optional")
+
+    def test_checks_on_decorated_class(self):
+        @asynctest.fail_on(optional=True)
+        class Dummy_TestCase(Test.FooTestCase):
+            pass
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(Dummy_TestCase(), method)()
+                self.assert_checked("default", "optional")
+
+    def test_check_after_tearDown(self):
+        self.mocks['default'].side_effect = AssertionError
+
+        class Dummy_TestCase(asynctest.TestCase):
+            def tearDown(self):
+                self.tearDown_called = True
+
+            def runTest(self):
+                pass
+
+        with self.subTest(method="debug"):
+            case = Dummy_TestCase()
+            with self.assertRaises(AssertionError):
+                case.debug()
+
+            self.assertTrue(case.tearDown_called)
+
+        case = Dummy_TestCase()
+        result = case.run()
+        self.assertEqual(1, len(result.failures))
+        self.assertTrue(case.tearDown_called)
 
 
 if __name__ == "__main__":

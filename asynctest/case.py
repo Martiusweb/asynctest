@@ -183,11 +183,11 @@ class TestCase(unittest.case.TestCase):
         self.loop = None
 
     def _patch_loop(self, loop):
-        if hasattr(loop, '__asynctest_ran'):
+        if hasattr(loop, '_asynctest_ran'):
             # The loop is already patched
             return loop
 
-        loop.__asynctest_ran = False
+        loop._asynctest_ran = False
 
         def wraps(method):
             @functools.wraps(method)
@@ -195,7 +195,7 @@ class TestCase(unittest.case.TestCase):
                 try:
                     return method(*args, **kwargs)
                 finally:
-                    loop.__asynctest_ran = True
+                    loop._asynctest_ran = True
 
             return types.MethodType(wrapper, loop)
 
@@ -217,13 +217,17 @@ class TestCase(unittest.case.TestCase):
             self.setUp()
 
         # don't take into account if the loop ran during setUp
-        self.loop.__asynctest_ran = False
+        self.loop._asynctest_ran = False
 
     def _tearDown(self):
         if asyncio.iscoroutinefunction(self.tearDown):
             self.loop.run_until_complete(self.tearDown())
         else:
             self.tearDown()
+
+        test = getattr(self, self._testMethodName)
+        checker = getattr(test, _FAIL_ON_ATTR, None) or _fail_on()
+        checker.check_test(self)
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
     def run(self, result=None):
@@ -311,14 +315,6 @@ class TestCase(unittest.case.TestCase):
         result = method()
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
-            return
-
-        if (getattr(self.__class__, "__asynctest_ignore_loop__", False) or
-                getattr(method, "__asynctest_ignore_loop__", False)):
-            return
-
-        if not self.loop.__asynctest_ran:
-            self.fail("Loop did not run during the test")
 
     def addCleanup(self, function, *args, **kwargs):
         """
@@ -401,12 +397,112 @@ class ClockedTestCase(TestCase):
                 break
 
             yield from asyncio.sleep(0)
-            self.loop._TestCase__asynctest_ran = True
+            self.loop._TestCase_asynctest_ran = True
 
 
-def ignore_loop(test):
+def ignore_loop(func=None):
     """
     Ignore the error case where the loop did not run during the test.
+
+    :deprecated: since 0.8, use :func:`fail_on` with ``unused_loop=False``
+    instead.
     """
-    test.__asynctest_ignore_loop__ = True
-    return test
+    checker = _fail_on({"unused_loop": False})
+    return checker if func is None else checker(func)
+
+
+FAIL_ON_DEFAULTS = {
+    "unused_loop": True,
+}
+
+_FAIL_ON_ATTR = "_asynctest_fail_on"
+
+
+class _fail_on:
+    def __init__(self, checks=None):
+        self.checks = checks or {}
+
+    def __call__(self, func):
+        checker = getattr(func, _FAIL_ON_ATTR, None)
+        if checker:
+            checker = checker.copy()
+            checker.update(self.checks)
+        else:
+            checker = self.copy()
+
+        setattr(func, _FAIL_ON_ATTR, checker)
+        return func
+
+    def update(self, checks, override=True):
+        if override:
+            self.checks.update(checks)
+        else:
+            for check, value in checks.items():
+                self.checks.setdefault(check, value)
+
+    def copy(self):
+        return _fail_on(self.checks.copy())
+
+    def get_checks(self, case):
+        checks = FAIL_ON_DEFAULTS.copy()
+
+        try:
+            checks.update(getattr(case, _FAIL_ON_ATTR, None).checks)
+        except AttributeError:
+            pass
+
+        checks.update(self.checks)
+
+        return checks
+
+    def check_test(self, case):
+        checks = self.get_checks(case)
+        for check in filter(checks.get, checks):
+            getattr(self, check)(case)
+
+    # checks
+
+    @staticmethod
+    def unused_loop(case):
+        if not case.loop._asynctest_ran:
+            case.fail("Loop did not run during the test")
+
+
+def fail_on(**kwargs):
+    """
+    Enable checks on the loop state after a test ran to help testers to
+    identify common mistakes.
+
+    Available checks are:
+
+        * ``unused_loop``: enabled by default, checks that the loop ran during
+          at least once during the test. This check can not fail if the test
+          method is a coroutine.
+
+    The decorator of a method has a greater priority than the decorator of
+    a class. When :func:`fail_on` decorates a class and one of its methods
+    with conflicting arguments, those of the class are overriden.
+
+    Subclasses of a decorated :class:`TestCase` inherit of the checks enabled
+    on the parent class.
+    """
+    for kwarg in kwargs:
+        if kwarg not in FAIL_ON_DEFAULTS:
+            raise TypeError("fail_on() got an unexpected keyword argument "
+                            "'{}'".format(kwarg))
+
+    return _fail_on(kwargs)
+
+
+def strict(func=None):
+    """
+    Activate strict checking of the state of the loop after a test ran.
+
+    It is a shortcut to :func:`fail_on` with all checks set to ``True``.
+
+    Note that by definition, the behavior of :func:`strict` will change in the
+    future when new checks will be added, and may break existing tests with new
+    errors after an update of the library.
+    """
+    checker = _fail_on(dict((arg, True) for arg in FAIL_ON_DEFAULTS))
+    return checker if func is None else checker(func)

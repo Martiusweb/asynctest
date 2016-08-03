@@ -698,7 +698,7 @@ patch.object = _patch_object
 patch.dict = _patch_dict
 patch.multiple = _patch_multiple
 patch.stopall = unittest.mock._patch_stopall
-patch.TEST_PREFIX = unittest.mock.patch.TEST_PREFIX
+patch.TEST_PREFIX = 'test'
 
 
 sentinel = unittest.mock.sentinel
