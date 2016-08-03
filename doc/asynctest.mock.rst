@@ -71,7 +71,7 @@
         :param scope: :const:`asynctest.GLOBAL` or :const:`asynctest.LIMITED`,
             controls when the patch is activated on generators and coroutines
 
-        :see: :func:`patch` (details about ``scope``) and
+        :see: :func:`~asynctest.patch` (details about ``scope``) and
             :func:`unittest.mock.patch.dict`.
 
     Helpers
