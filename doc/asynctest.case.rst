@@ -77,6 +77,14 @@
 
         .. versionadded:: 0.8
 
+    .. decorator:: lenient
+
+        Deactivate all checks performed after a test ran.
+
+        It is a shortcut to :func:`fail_on` with all checks set to ``False``.
+
+        .. versionadded:: 0.8
+
     .. decorator:: asynctest.ignore_loop
 
        By default, a test fails if the loop did not run during the test

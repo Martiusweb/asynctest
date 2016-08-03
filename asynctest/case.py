@@ -484,10 +484,22 @@ def fail_on(**kwargs):
     return _fail_on(kwargs)
 
 
+def _fail_on_all(flag, func):
+    checker = _fail_on(dict((arg, flag) for arg in FAIL_ON_DEFAULTS))
+    return checker if func is None else checker(func)
+
+
 def strict(func=None):
     """
     Activate strict checking of the state of the loop after a test ran.
     """
     # documented in asynctest.case.rst
-    checker = _fail_on(dict((arg, True) for arg in FAIL_ON_DEFAULTS))
-    return checker if func is None else checker(func)
+    return _fail_on_all(True, func)
+
+
+def lenient(func=None):
+    """
+    Deactivate all checks after a test ran.
+    """
+    # documented in asynctest.case.rst
+    return _fail_on_all(False, func)

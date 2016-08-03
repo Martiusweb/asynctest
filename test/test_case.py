@@ -542,6 +542,19 @@ class Test_fail_on_decorator(unittest.TestCase):
 
         self.assert_checks_equal(TestCase(), foo=True, bar=True)
 
+    def test_lenient_decorator(self):
+        @asynctest.lenient
+        class TestCase(asynctest.TestCase):
+            pass
+
+        self.assert_checks_equal(TestCase(), foo=False, bar=False)
+
+        @asynctest.lenient()
+        class TestCase(asynctest.TestCase):
+            pass
+
+        self.assert_checks_equal(TestCase(), foo=False, bar=False)
+
 
 fail_on_defaults = {"default": True, "optional": False}
 
