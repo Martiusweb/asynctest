@@ -32,6 +32,7 @@ import warnings
 from unittest.case import *  # NOQA
 
 import asynctest.selector
+import asynctest._fail_on
 
 
 class _Policy(asyncio.AbstractEventLoopPolicy):
@@ -105,7 +106,7 @@ class TestCase(unittest.case.TestCase):
 
     Once the test returned, one or more assertions are checked. For instance,
     a test fails if the loop didn't run. These checks can be enabled or
-    disabled using the :func:`fail_on` decorator.
+    disabled using the :func:`~asynctest.fail_on` decorator.
 
     By default, a new loop is created and is set as the default loop before
     each test. Test authors can retrieve this loop with
@@ -146,7 +147,7 @@ class TestCase(unittest.case.TestCase):
     .. versionadded:: 0.8
 
         ``ignore_loop`` has been deprecated in favor of the extensible
-        :func:`fail_on` decorator.
+        :func:`~asynctest.fail_on` decorator.
     """
     #: If true, the loop used by the test case is the current default event
     #: loop returned by :func:`asyncio.get_event_loop()`. The loop will not be
@@ -229,7 +230,8 @@ class TestCase(unittest.case.TestCase):
             self.tearDown()
 
         test = getattr(self, self._testMethodName)
-        checker = getattr(test, _FAIL_ON_ATTR, None) or _fail_on()
+        checker = (getattr(test, asynctest._fail_on._FAIL_ON_ATTR, None) or
+                   asynctest._fail_on._fail_on())
         checker.check_test(self)
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
@@ -409,97 +411,5 @@ def ignore_loop(func=None):
     """
     warnings.warn("ignore_loop() is deprected in favor of "
                   "fail_on(unused_loop=False)", DeprecationWarning)
-    checker = _fail_on({"unused_loop": False})
+    checker = asynctest._fail_on._fail_on({"unused_loop": False})
     return checker if func is None else checker(func)
-
-
-FAIL_ON_DEFAULTS = {
-    "unused_loop": True,
-}
-
-_FAIL_ON_ATTR = "_asynctest_fail_on"
-
-
-class _fail_on:
-    def __init__(self, checks=None):
-        self.checks = checks or {}
-
-    def __call__(self, func):
-        checker = getattr(func, _FAIL_ON_ATTR, None)
-        if checker:
-            checker = checker.copy()
-            checker.update(self.checks)
-        else:
-            checker = self.copy()
-
-        setattr(func, _FAIL_ON_ATTR, checker)
-        return func
-
-    def update(self, checks, override=True):
-        if override:
-            self.checks.update(checks)
-        else:
-            for check, value in checks.items():
-                self.checks.setdefault(check, value)
-
-    def copy(self):
-        return _fail_on(self.checks.copy())
-
-    def get_checks(self, case):
-        checks = FAIL_ON_DEFAULTS.copy()
-
-        try:
-            checks.update(getattr(case, _FAIL_ON_ATTR, None).checks)
-        except AttributeError:
-            pass
-
-        checks.update(self.checks)
-
-        return checks
-
-    def check_test(self, case):
-        checks = self.get_checks(case)
-        for check in filter(checks.get, checks):
-            getattr(self, check)(case)
-
-    # checks
-
-    @staticmethod
-    def unused_loop(case):
-        if not case.loop._asynctest_ran:
-            case.fail("Loop did not run during the test")
-
-
-def fail_on(**kwargs):
-    """
-    Enable checks on the loop state after a test ran to help testers to
-    identify common mistakes.
-    """
-    # documented in asynctest.case.rst
-    for kwarg in kwargs:
-        if kwarg not in FAIL_ON_DEFAULTS:
-            raise TypeError("fail_on() got an unexpected keyword argument "
-                            "'{}'".format(kwarg))
-
-    return _fail_on(kwargs)
-
-
-def _fail_on_all(flag, func):
-    checker = _fail_on(dict((arg, flag) for arg in FAIL_ON_DEFAULTS))
-    return checker if func is None else checker(func)
-
-
-def strict(func=None):
-    """
-    Activate strict checking of the state of the loop after a test ran.
-    """
-    # documented in asynctest.case.rst
-    return _fail_on_all(True, func)
-
-
-def lenient(func=None):
-    """
-    Deactivate all checks after a test ran.
-    """
-    # documented in asynctest.case.rst
-    return _fail_on_all(False, func)

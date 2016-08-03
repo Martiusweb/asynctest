@@ -57,11 +57,12 @@
               but it actually didn't.
 
         The decorator of a method has a greater priority than the decorator of
-        a class. When :func:`fail_on` decorates a class and one of its methods
-        with conflicting arguments, those of the class are overriden.
+        a class. When :func:`~asynctest.fail_on` decorates a class and one of
+        its methods with conflicting arguments, those of the class are
+        overriden.
 
-        Subclasses of a decorated :class:`TestCase` inherit of the checks
-        enabled on the parent class.
+        Subclasses of a decorated :class:`~asynctest.TestCase` inherit of the
+        checks enabled on the parent class.
 
         .. versionadded:: 0.8
 
@@ -69,7 +70,8 @@
 
         Activate strict checking of the state of the loop after a test ran.
 
-        It is a shortcut to :func:`fail_on` with all checks set to ``True``.
+        It is a shortcut to :func:`~asynctest.fail_on` with all checks set to
+        ``True``.
 
         Note that by definition, the behavior of :func:`strict` will change in
         the future when new checks will be added, and may break existing tests
@@ -81,7 +83,8 @@
 
         Deactivate all checks performed after a test ran.
 
-        It is a shortcut to :func:`fail_on` with all checks set to ``False``.
+        It is a shortcut to :func:`~asynctest.fail_on` with all checks set to
+        ``False``.
 
         .. versionadded:: 0.8
 
@@ -94,4 +97,4 @@
 
         .. deprecated:: 0.8
 
-            Use :func:`fail_on` with ``unused_loop=False`` instead.
+            Use :func:`~asynctest.fail_on` with ``unused_loop=False`` instead.

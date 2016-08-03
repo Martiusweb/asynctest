@@ -427,7 +427,7 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.assertEqual(call_time, expected)
 
 
-@unittest.mock.patch.dict("asynctest.case.FAIL_ON_DEFAULTS",
+@unittest.mock.patch.dict("asynctest._fail_on.DEFAULTS",
                           values={"foo": False, "bar": True},
                           clear=True)
 class Test_fail_on_decorator(unittest.TestCase):
@@ -438,7 +438,7 @@ class Test_fail_on_decorator(unittest.TestCase):
             case = obj.__self__
 
         try:
-            return getattr(obj, asynctest.case._FAIL_ON_ATTR).get_checks(case)
+            return getattr(obj, asynctest._fail_on._FAIL_ON_ATTR).get_checks(case)
         except AttributeError:
             if fatal:
                 self.fail("{!r} not decorated".format(obj))
@@ -559,16 +559,16 @@ class Test_fail_on_decorator(unittest.TestCase):
 fail_on_defaults = {"default": True, "optional": False}
 
 
-@unittest.mock.patch.dict("asynctest.case.FAIL_ON_DEFAULTS",
+@unittest.mock.patch.dict("asynctest._fail_on.DEFAULTS",
                           values=fail_on_defaults, clear=True)
 class Test_fail_on(_TestCase):
     def setUp(self):
         self.mocks = {}
         for method in fail_on_defaults:
             mock = self.mocks[method] = unittest.mock.Mock()
-            setattr(asynctest.case._fail_on, method, mock)
+            setattr(asynctest._fail_on._fail_on, method, mock)
 
-        self.addCleanup(lambda: [delattr(asynctest.case._fail_on, method)
+        self.addCleanup(lambda: [delattr(asynctest._fail_on._fail_on, method)
                                  for method in fail_on_defaults])
 
     def tearDown(self):
@@ -626,8 +626,8 @@ class Test_fail_on(_TestCase):
 
 
 @unittest.mock.patch.dict(
-    "asynctest.case.FAIL_ON_DEFAULTS",
-    unused_loop=asynctest.case.FAIL_ON_DEFAULTS['unused_loop'], clear=True)
+    "asynctest._fail_on.DEFAULTS",
+    unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'], clear=True)
 class Test_fail_on_unused_loop(_TestCase):
     def test_fails_when_loop_didnt_run(self):
         with self.assertRaisesRegex(AssertionError,
