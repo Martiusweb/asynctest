@@ -27,6 +27,7 @@ import asyncio
 import functools
 import types
 import unittest.case
+import warnings
 
 from unittest.case import *  # NOQA
 
@@ -102,12 +103,9 @@ class TestCase(unittest.case.TestCase):
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
 
-    Else, once the test returned, a final assertion on whether the loop ran or
-    not is checked. This allows to detect cases where a test author assume its
-    test will run tasks or callbacks on the loop, but it actually didn't. When
-    the test author doesn't need this assertion to be verified, the test
-    function or :class:`~asynctest.TestCase` class can be decorated with
-    :func:`~asynctest.ignore_loop`.
+    Once the test returned, one or more assertions are checked. For instance,
+    a test fails if the loop didn't run. These checks can be enabled or
+    disabled using the :func:`fail_on` decorator.
 
     By default, a new loop is created and is set as the default loop before
     each test. Test authors can retrieve this loop with
@@ -144,6 +142,11 @@ class TestCase(unittest.case.TestCase):
         attribute :attr:`~asynctest.TestCase.forbid_get_event_loop`.
         In any case, the default loop is now reset to its original state
         outside a test function.
+
+    .. versionadded:: 0.8
+
+        ``ignore_loop`` has been deprecated in favor of the extensible
+        :func:`fail_on` decorator.
     """
     #: If true, the loop used by the test case is the current default event
     #: loop returned by :func:`asyncio.get_event_loop()`. The loop will not be
@@ -403,10 +406,9 @@ class ClockedTestCase(TestCase):
 def ignore_loop(func=None):
     """
     Ignore the error case where the loop did not run during the test.
-
-    :deprecated: since 0.8, use :func:`fail_on` with ``unused_loop=False``
-    instead.
     """
+    warnings.warn("ignore_loop() is deprected in favor of "
+                  "fail_on(unused_loop=False)", DeprecationWarning)
     checker = _fail_on({"unused_loop": False})
     return checker if func is None else checker(func)
 
@@ -472,20 +474,8 @@ def fail_on(**kwargs):
     """
     Enable checks on the loop state after a test ran to help testers to
     identify common mistakes.
-
-    Available checks are:
-
-        * ``unused_loop``: enabled by default, checks that the loop ran during
-          at least once during the test. This check can not fail if the test
-          method is a coroutine.
-
-    The decorator of a method has a greater priority than the decorator of
-    a class. When :func:`fail_on` decorates a class and one of its methods
-    with conflicting arguments, those of the class are overriden.
-
-    Subclasses of a decorated :class:`TestCase` inherit of the checks enabled
-    on the parent class.
     """
+    # documented in asynctest.case.rst
     for kwarg in kwargs:
         if kwarg not in FAIL_ON_DEFAULTS:
             raise TypeError("fail_on() got an unexpected keyword argument "
@@ -497,12 +487,7 @@ def fail_on(**kwargs):
 def strict(func=None):
     """
     Activate strict checking of the state of the loop after a test ran.
-
-    It is a shortcut to :func:`fail_on` with all checks set to ``True``.
-
-    Note that by definition, the behavior of :func:`strict` will change in the
-    future when new checks will be added, and may break existing tests with new
-    errors after an update of the library.
     """
+    # documented in asynctest.case.rst
     checker = _fail_on(dict((arg, True) for arg in FAIL_ON_DEFAULTS))
     return checker if func is None else checker(func)

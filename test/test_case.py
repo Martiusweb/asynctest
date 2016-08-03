@@ -27,7 +27,7 @@ class Test:
         def test_foo(self):
             pass
 
-    @asynctest.ignore_loop
+    @asynctest.fail_on(unused_loop=False)
     class LoggingTestCase(asynctest.TestCase):
         def __init__(self, calls):
             super().__init__()
@@ -77,7 +77,7 @@ class Test_TestCase(_TestCase):
     def test_init_and_close_loop_for_test(self):
         default_loop = self.create_default_loop()
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class LoopTest(asynctest.TestCase):
             failing = False
 
@@ -113,7 +113,7 @@ class Test_TestCase(_TestCase):
     def test_default_loop_is_not_created_when_unused(self):
         policy = asyncio.get_event_loop_policy()
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class Dummy_TestCase(Test.FooTestCase):
             pass
 
@@ -131,7 +131,7 @@ class Test_TestCase(_TestCase):
         self.addCleanup(a_loop.close)
 
         class Update_Default_Loop_TestCase(asynctest.TestCase):
-            @asynctest.ignore_loop
+            @asynctest.fail_on(unused_loop=False)
             def runTest(self):
                 self.assertIs(self.loop, asyncio.get_event_loop())
                 asyncio.set_event_loop(a_loop)
@@ -153,7 +153,7 @@ class Test_TestCase(_TestCase):
         class Using_Default_Loop_TestCase(asynctest.TestCase):
             use_default_loop = True
 
-            @asynctest.ignore_loop
+            @asynctest.fail_on(unused_loop=False)
             def runTest(self):
                 self.assertIs(default_loop, self.loop)
 
@@ -230,112 +230,15 @@ class Test_TestCase(_TestCase):
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
-    def test_fails_when_loop_didnt_run(self):
-        with self.assertRaisesRegex(AssertionError,
-                                    'Loop did not run during the test'):
-            Test.FooTestCase().debug()
-
-        result = Test.FooTestCase().run()
-        self.assertEqual(1, len(result.failures))
-
-    def test_fails_when_loop_didnt_run_using_default_loop(self):
-        class TestCase(Test.FooTestCase):
-            use_default_loop = True
-
-        default_loop = self.create_default_loop()
-
-        with self.assertRaisesRegex(AssertionError,
-                                    'Loop did not run during the test'):
-            TestCase().debug()
-
-        result = TestCase().run()
-        self.assertEqual(1, len(result.failures))
-
-        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
-
-        with self.assertRaisesRegex(AssertionError,
-                                    'Loop did not run during the test'):
-            TestCase().debug()
-
-        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
-
-        result = TestCase().run()
-        self.assertEqual(1, len(result.failures))
-
-    def test_fails_when_loop_ran_only_during_setup(self):
-        for test_use_default_loop in (False, True):
-            with self.subTest(use_default_loop=test_use_default_loop):
-                if test_use_default_loop:
-                    self.create_default_loop()
-
-                class TestCase(Test.FooTestCase):
-                    use_default_loop = test_use_default_loop
-
-                    def setUp(self):
-                        self.loop.run_until_complete(asyncio.sleep(0, loop=self.loop))
-
-                with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
-                    TestCase().debug()
-
-                result = TestCase().run()
-                self.assertEqual(1, len(result.failures))
-
-    def test_fails_when_loop_ran_only_during_cleanup(self):
-        for test_use_default_loop in (False, True):
-            with self.subTest(use_default_loop=test_use_default_loop):
-                if test_use_default_loop:
-                    self.create_default_loop()
-
-                class TestCase(Test.FooTestCase):
-                    use_default_loop = test_use_default_loop
-
-                    def setUp(self):
-                        self.addCleanup(asyncio.coroutine(lambda: None))
-
-                with self.assertRaisesRegex(AssertionError, 'Loop did not run during the test'):
-                    TestCase().debug()
-
-                result = TestCase().run()
-                self.assertEqual(1, len(result.failures))
-
-    def test_passes_when_ignore_loop_or_loop_run(self):
-        @asynctest.ignore_loop
-        class IgnoreLoopClassTest(Test.FooTestCase):
-            pass
-
-        class IgnoreLoopMethodTest(asynctest.TestCase):
-            @asynctest.ignore_loop
-            def runTest(self):
-                pass
-
-        class WithCoroutineTest(asynctest.TestCase):
-            @asyncio.coroutine
-            def runTest(self):
-                yield from []
-
-        class WithFunctionCallingLoopTest(asynctest.TestCase):
-            def runTest(self):
-                fut = asyncio.Future()
-                self.loop.call_soon(fut.set_result, None)
-                self.loop.run_until_complete(fut)
-
-        for test in (IgnoreLoopClassTest, IgnoreLoopMethodTest,
-                     WithCoroutineTest, WithFunctionCallingLoopTest):
-            with self.subTest(test=test):
-                test().debug()
-
-                result = test().run()
-                self.assertEqual(0, len(result.failures))
-
     def test_setup_teardown_may_be_coroutines(self):
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class WithSetupFunction(Test.FooTestCase):
             ran = False
 
             def setUp(self):
                 WithSetupFunction.ran = True
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class WithSetupCoroutine(Test.FooTestCase):
             ran = False
 
@@ -343,14 +246,14 @@ class Test_TestCase(_TestCase):
             def setUp(self):
                 WithSetupCoroutine.ran = True
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class WithTearDownFunction(Test.FooTestCase):
             ran = False
 
             def tearDown(self):
                 WithTearDownFunction.ran = True
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class WithTearDownCoroutine(Test.FooTestCase):
             ran = False
 
@@ -381,7 +284,7 @@ class Test_TestCase(_TestCase):
             nonlocal cleanup_coro_called
             cleanup_coro_called = True
 
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class TestCase(Test.FooTestCase):
             def setUp(self):
                 nonlocal cleanup_normal_called, cleanup_normal_called_too_soon
@@ -401,7 +304,7 @@ class Test_TestCase(_TestCase):
                 self.assertTrue(cleanup_coro_called)
 
     def test_loop_uses_TestSelector(self):
-        @asynctest.ignore_loop
+        @asynctest.fail_on(unused_loop=False)
         class CheckLoopTest(asynctest.TestCase):
             def runTest(self):
                 # TestSelector is used
@@ -707,6 +610,106 @@ class Test_fail_on(_TestCase):
         result = case.run()
         self.assertEqual(1, len(result.failures))
         self.assertTrue(case.tearDown_called)
+
+
+@unittest.mock.patch.dict(
+    "asynctest.case.FAIL_ON_DEFAULTS",
+    unused_loop=asynctest.case.FAIL_ON_DEFAULTS['unused_loop'], clear=True)
+class Test_fail_on_unused_loop(_TestCase):
+    def test_fails_when_loop_didnt_run(self):
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
+            Test.FooTestCase().debug()
+
+        result = Test.FooTestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+    def test_fails_when_loop_didnt_run_using_default_loop(self):
+        class TestCase(Test.FooTestCase):
+            use_default_loop = True
+
+        default_loop = self.create_default_loop()
+
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
+            TestCase().debug()
+
+        result = TestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
+
+        with self.assertRaisesRegex(AssertionError,
+                                    'Loop did not run during the test'):
+            TestCase().debug()
+
+        default_loop.run_until_complete(asyncio.sleep(0, loop=default_loop))
+
+        result = TestCase().run()
+        self.assertEqual(1, len(result.failures))
+
+    def test_passes_when_ignore_loop_or_loop_run(self):
+        @asynctest.fail_on(unused_loop=False)
+        class IgnoreLoopClassTest(Test.FooTestCase):
+            pass
+
+        class WithCoroutineTest(asynctest.TestCase):
+            @asyncio.coroutine
+            def runTest(self):
+                yield from []
+
+        class WithFunctionCallingLoopTest(asynctest.TestCase):
+            def runTest(self):
+                fut = asyncio.Future()
+                self.loop.call_soon(fut.set_result, None)
+                self.loop.run_until_complete(fut)
+
+        for test in (IgnoreLoopClassTest, WithCoroutineTest,
+                     WithFunctionCallingLoopTest):
+            with self.subTest(test=test):
+                test().debug()
+
+                result = test().run()
+                self.assertEqual(0, len(result.failures))
+
+    def test_fails_when_loop_ran_only_during_setup(self):
+        for test_use_default_loop in (False, True):
+            with self.subTest(use_default_loop=test_use_default_loop):
+                if test_use_default_loop:
+                    self.create_default_loop()
+
+                class TestCase(Test.FooTestCase):
+                    use_default_loop = test_use_default_loop
+
+                    def setUp(self):
+                        self.loop.run_until_complete(
+                            asyncio.sleep(0, loop=self.loop))
+
+                with self.assertRaisesRegex(
+                        AssertionError, 'Loop did not run during the test'):
+                    TestCase().debug()
+
+                result = TestCase().run()
+                self.assertEqual(1, len(result.failures))
+
+    def test_fails_when_loop_ran_only_during_cleanup(self):
+        for test_use_default_loop in (False, True):
+            with self.subTest(use_default_loop=test_use_default_loop):
+                if test_use_default_loop:
+                    self.create_default_loop()
+
+                class TestCase(Test.FooTestCase):
+                    use_default_loop = test_use_default_loop
+
+                    def setUp(self):
+                        self.addCleanup(asyncio.coroutine(lambda: None))
+
+                with self.assertRaisesRegex(
+                        AssertionError, 'Loop did not run during the test'):
+                    TestCase().debug()
+
+                result = TestCase().run()
+                self.assertEqual(1, len(result.failures))
 
 
 if __name__ == "__main__":
