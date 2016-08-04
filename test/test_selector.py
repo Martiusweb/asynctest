@@ -260,3 +260,79 @@ class Test_set_read_write_ready(Selector_TestCase):
 
                 self.loop.run_until_complete(future)
                 callback_mock.assert_called_with()
+
+
+@unittest.mock.patch.dict('asynctest._fail_on.DEFAULTS', clear=True,
+                          active_selector_callbacks=True)
+class Test_fail_on_active_selector_callbacks(Selector_TestCase):
+    def test_passes_without_callbacks_set(self):
+        class TestCase(asynctest.TestCase):
+            def runTest(self):
+                pass
+
+        TestCase().debug()
+
+    def test_passes_when_no_callbacks_left(self):
+        class TestCase(asynctest.TestCase):
+            def runTest(self):
+                mock = asynctest.selector.FileMock()
+                self.loop.add_reader(mock, lambda: None)
+                self.loop.remove_reader(mock)
+
+        TestCase().debug()
+
+    def test_events_watched_outside_test_are_ignored(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            mock = asynctest.selector.FileMock()
+            loop.add_reader(mock, lambda: None)
+            self.addCleanup(loop.remove_reader, mock)
+
+            class TestCase(asynctest.TestCase):
+                use_default_loop = False
+
+                def runTest(self):
+                    pass
+
+            TestCase().debug()
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)
+
+    def test_fail_on_active_selector_callbacks_on_mock_files(self):
+        class TestCase(asynctest.TestCase):
+            def runTest(self):
+                mock = asynctest.selector.FileMock()
+                self.loop.add_reader(mock, lambda: None)
+                # it's too late to check that during cleanup
+                self.addCleanup(self.loop.remove_reader, mock)
+
+        with self.assertRaisesRegex(AssertionError, "some events watched "
+                                    "during the tests were not removed"):
+            TestCase().debug()
+
+    def test_fail_on_original_selector_callback(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            with unittest.mock.patch.object(loop, "_selector") as mock:
+                class TestCase(asynctest.TestCase):
+                    use_default_loop = True
+
+                    def runTest(self):
+                        # add a dummy event
+                        handle = asyncio.Handle(lambda: None, (), self.loop)
+                        key = selectors.SelectorKey(1, 1, selectors.EVENT_READ,
+                                                    (handle, None))
+                        mock.get_map.return_value = {1: key}
+
+                with self.assertRaisesRegex(AssertionError,
+                                            "some events watched during the "
+                                            "tests were not removed"):
+                    TestCase().debug()
+        finally:
+            loop.close()
+            asyncio.set_event_loop(None)

@@ -77,7 +77,7 @@ class Test_TestCase(_TestCase):
     def test_init_and_close_loop_for_test(self):
         default_loop = self.create_default_loop()
 
-        @asynctest.fail_on(unused_loop=False)
+        @asynctest.lenient
         class LoopTest(asynctest.TestCase):
             failing = False
 
@@ -682,8 +682,8 @@ class Test_fail_on(_TestCase):
 
 
 @unittest.mock.patch.dict(
-    "asynctest._fail_on.DEFAULTS",
-    unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'], clear=True)
+    "asynctest._fail_on.DEFAULTS", clear=True,
+    unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'])
 class Test_fail_on_unused_loop(_TestCase):
     def test_fails_when_loop_didnt_run(self):
         with self.assertRaisesRegex(AssertionError,

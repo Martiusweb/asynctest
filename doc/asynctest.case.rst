@@ -56,6 +56,12 @@
               author assume its test will run tasks or callbacks on the loop,
               but it actually didn't.
 
+            * ``active_selector_callbacks``: enabled by default, checks that
+              any registered reader or writer callback on a selector loop (with
+              ``add_reader()`` or ``add_writer()``) is later explicitly
+              unregistered  (with ``remove_reader()`` or ``remove_writer()``)
+              before the end of the test.
+
         The decorator of a method has a greater priority than the decorator of
         a class. When :func:`~asynctest.fail_on` decorates a class and one of
         its methods with conflicting arguments, those of the class are
