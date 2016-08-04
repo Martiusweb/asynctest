@@ -19,6 +19,7 @@ DEFAULTS = {
 class _fail_on:
     def __init__(self, checks=None):
         self.checks = checks or {}
+        self._computed_checks = None
 
     def __call__(self, func):
         checker = getattr(func, _FAIL_ON_ATTR, None)
@@ -42,16 +43,27 @@ class _fail_on:
         return _fail_on(self.checks.copy())
 
     def get_checks(self, case):
-        checks = DEFAULTS.copy()
+        # cache the result so it's consistent accross calls to get_checks()
+        if self._computed_checks is None:
+            checks = DEFAULTS.copy()
 
-        try:
-            checks.update(getattr(case, _FAIL_ON_ATTR, None).checks)
-        except AttributeError:
-            pass
+            try:
+                checks.update(getattr(case, _FAIL_ON_ATTR, None).checks)
+            except AttributeError:
+                pass
 
-        checks.update(self.checks)
+            checks.update(self.checks)
+            self._computed_checks = checks
 
-        return checks
+        return self._computed_checks
+
+    def before_test(self, case):
+        checks = self.get_checks(case)
+        for check in filter(checks.get, checks):
+            try:
+                getattr(self, "before_test_" + check)(case)
+            except (AttributeError, TypeError):
+                pass
 
     def check_test(self, case):
         checks = self.get_checks(case)

@@ -624,6 +624,58 @@ class Test_fail_on(_TestCase):
         self.assertEqual(1, len(result.failures))
         self.assertTrue(case.tearDown_called)
 
+    def test_before_test_called_before_user_setup(self):
+        mock = unittest.mock.Mock()
+        setattr(asynctest._fail_on._fail_on, "before_test_default", mock)
+        self.addCleanup(delattr, asynctest._fail_on._fail_on,
+                        "before_test_default")
+
+        class TestCase(asynctest.TestCase):
+            def setUp(self):
+                self.assertTrue(mock.called)
+
+            def runTest(self):
+                pass
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(Test.FooTestCase(), method)()
+
+        self.assert_checked("default")
+        self.assertTrue(mock.called)
+
+    def test_non_existing_before_test_wont_fail(self):
+        # set something not callable for default, nothing for optional, the
+        # test must not fail
+        setattr(asynctest._fail_on._fail_on, "before_test_default", None)
+        self.addCleanup(delattr, asynctest._fail_on._fail_on,
+                        "before_test_default")
+
+        @asynctest.fail_on(default=True, optional=True)
+        class TestCase(asynctest.TestCase):
+            def runTest(self):
+                pass
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(TestCase(), method)()
+                self.assert_checked("default", "optional")
+
+    def test_before_test_called_for_enabled_checks_only(self):
+        for method in map(lambda m: "before_test_" + m, fail_on_defaults):
+            mock = self.mocks[method] = unittest.mock.Mock()
+            setattr(asynctest._fail_on._fail_on, method, mock)
+
+        self.addCleanup(lambda: [delattr(asynctest._fail_on._fail_on,
+                                         "before_test_" + method)
+                                 for method in fail_on_defaults])
+
+        for method in self.run_methods:
+            with self.subTest(method=method):
+                getattr(Test.FooTestCase(), method)()
+                self.assertTrue(self.mocks["before_test_default"].called)
+                self.assertFalse(self.mocks["before_test_optional"].called)
+
 
 @unittest.mock.patch.dict(
     "asynctest._fail_on.DEFAULTS",

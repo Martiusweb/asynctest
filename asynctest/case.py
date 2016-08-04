@@ -215,6 +215,12 @@ class TestCase(unittest.case.TestCase):
         self._init_loop()
         self.addCleanup(self._unset_loop)
 
+        # initialize post-test checks
+        test = getattr(self, self._testMethodName)
+        checker = getattr(test, asynctest._fail_on._FAIL_ON_ATTR, None)
+        self._checker = checker or asynctest._fail_on._fail_on()
+        self._checker.before_test(self)
+
         if asyncio.iscoroutinefunction(self.setUp):
             self.loop.run_until_complete(self.setUp())
         else:
@@ -229,10 +235,8 @@ class TestCase(unittest.case.TestCase):
         else:
             self.tearDown()
 
-        test = getattr(self, self._testMethodName)
-        checker = (getattr(test, asynctest._fail_on._FAIL_ON_ATTR, None) or
-                   asynctest._fail_on._fail_on())
-        checker.check_test(self)
+        # post-test checks
+        self._checker.check_test(self)
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
     def run(self, result=None):
