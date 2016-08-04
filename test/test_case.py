@@ -587,10 +587,12 @@ class Test_fail_on(_TestCase):
     def test_default_checks(self):
         for method in self.run_methods:
             with self.subTest(method=method):
-                getattr(Test.FooTestCase(), method)()
+                case = Test.FooTestCase()
+                getattr(case, method)()
 
                 self.assert_checked("default")
                 self.assert_not_checked("optional")
+                self.mocks["default"].assert_called_with(case)
 
     def test_checks_on_decorated_class(self):
         @asynctest.fail_on(optional=True)
@@ -639,10 +641,12 @@ class Test_fail_on(_TestCase):
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                getattr(Test.FooTestCase(), method)()
+                case = Test.FooTestCase()
+                getattr(case, method)()
 
-        self.assert_checked("default")
-        self.assertTrue(mock.called)
+                self.assert_checked("default")
+                self.assertTrue(mock.called)
+                mock.assert_called_with(case)
 
     def test_non_existing_before_test_wont_fail(self):
         # set something not callable for default, nothing for optional, the
