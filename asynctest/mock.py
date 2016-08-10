@@ -230,7 +230,7 @@ class MagicMock(unittest.mock.MagicMock, metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.MagicMock` so it returns
     a :class:`~asynctest.CoroutineMock` object instead of
-    a class:`~asynctest.Mock` object where a method on a ``spec`` or
+    a :class:`~asynctest.Mock` object where a method on a ``spec`` or
     ``spec_set`` object is a coroutine.
 
     If you want to mock a coroutine function, use :class:`CoroutineMock`
