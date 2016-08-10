@@ -23,6 +23,7 @@ from .case import *
 from .mock import *
 
 # And load or own tools
+from ._fail_on import *
 from .helpers import *
 from .selector import *
 
