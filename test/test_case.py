@@ -427,6 +427,26 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.assertEqual(call_time, expected)
 
 
+class Test_ClockedTestCase_setUp(asynctest.ClockedTestCase):
+    def setUp(self):
+        pass
+
+    @asyncio.coroutine
+    def test_setUp(self):
+        yield from self.advance(1)
+        self.assertEqual(1, self.loop.time())
+
+
+class Test_ClockedTestCase_async_setUp(asynctest.ClockedTestCase):
+    @asyncio.coroutine
+    def setUp(self):
+        yield from self.advance(1)
+
+    @asyncio.coroutine
+    def test_setUp(self):
+        self.assertEqual(1, self.loop.time())
+
+
 @unittest.mock.patch.dict("asynctest._fail_on.DEFAULTS",
                           values={"foo": False, "bar": True},
                           clear=True)

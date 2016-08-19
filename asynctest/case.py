@@ -350,8 +350,8 @@ class ClockedTestCase(TestCase):
     Subclass of :class:`~asynctest.TestCase` with a controlled loop clock,
     useful for testing timer based behaviour without slowing test run time.
     """
-    def setUp(self):
-        super().setUp()
+    def _init_loop(self):
+        super()._init_loop()
         self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
         self._time = 0
 
