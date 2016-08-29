@@ -39,7 +39,8 @@ TestCases
 
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
 
-  - a test fails if the loop did not run during the test,
+  - control post-test checks with `@fail_on`, for instance, the test fail if
+    the loop didn't run, some optional checks can be activated,
 
   - ClockedTestCase allows to control the loop clock and run timed events
     without waiting the wall clock.
@@ -101,14 +102,13 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
+- mocking of asynchronous iterators and context managers
 - set of warnings against common mistakes
 - proactor support
 
 Tests
 -----
 
-asynctest is unit tested. You can run asynctest test suite with this command:
-
-::
+asynctest is unit tested. You can run asynctest test suite with this command::
 
 $ PYTHONPATH=. python -m unittest test
