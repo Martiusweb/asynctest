@@ -27,10 +27,12 @@ import asyncio
 import functools
 import types
 import unittest.case
+import warnings
 
 from unittest.case import *  # NOQA
 
 import asynctest.selector
+import asynctest._fail_on
 
 
 class _Policy(asyncio.AbstractEventLoopPolicy):
@@ -102,12 +104,9 @@ class TestCase(unittest.case.TestCase):
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
 
-    Else, once the test returned, a final assertion on whether the loop ran or
-    not is checked. This allows to detect cases where a test author assume its
-    test will run tasks or callbacks on the loop, but it actually didn't. When
-    the test author doesn't need this assertion to be verified, the test
-    function or :class:`~asynctest.TestCase` class can be decorated with
-    :func:`~asynctest.ignore_loop`.
+    Once the test returned, one or more assertions are checked. For instance,
+    a test fails if the loop didn't run. These checks can be enabled or
+    disabled using the :func:`~asynctest.fail_on` decorator.
 
     By default, a new loop is created and is set as the default loop before
     each test. Test authors can retrieve this loop with
@@ -144,6 +143,11 @@ class TestCase(unittest.case.TestCase):
         attribute :attr:`~asynctest.TestCase.forbid_get_event_loop`.
         In any case, the default loop is now reset to its original state
         outside a test function.
+
+    .. versionadded:: 0.8
+
+        ``ignore_loop`` has been deprecated in favor of the extensible
+        :func:`~asynctest.fail_on` decorator.
     """
     #: If true, the loop used by the test case is the current default event
     #: loop returned by :func:`asyncio.get_event_loop()`. The loop will not be
@@ -172,30 +176,22 @@ class TestCase(unittest.case.TestCase):
 
         self.loop = self._patch_loop(self.loop)
 
-    @staticmethod
-    def _is_live_timer_handle(handle):
-        return (
-            isinstance(handle, asyncio.TimerHandle) and not handle._cancelled)
-
-    @property
-    def _live_timer_handles(self):
-        return filter(self._is_live_timer_handle, self.loop._scheduled)
-
     def _unset_loop(self):
         policy = asyncio.get_event_loop_policy()
 
         if not self.use_default_loop:
             self.loop.close()
             policy.reset_watcher()
+
         asyncio.set_event_loop_policy(policy.original_policy)
         self.loop = None
 
     def _patch_loop(self, loop):
-        if hasattr(loop, '__asynctest_ran'):
+        if hasattr(loop, '_asynctest_ran'):
             # The loop is already patched
             return loop
 
-        loop.__asynctest_ran = False
+        loop._asynctest_ran = False
 
         def wraps(method):
             @functools.wraps(method)
@@ -203,7 +199,7 @@ class TestCase(unittest.case.TestCase):
                 try:
                     return method(*args, **kwargs)
                 finally:
-                    loop.__asynctest_ran = True
+                    loop._asynctest_ran = True
 
             return types.MethodType(wrapper, loop)
 
@@ -219,19 +215,28 @@ class TestCase(unittest.case.TestCase):
         self._init_loop()
         self.addCleanup(self._unset_loop)
 
+        # initialize post-test checks
+        test = getattr(self, self._testMethodName)
+        checker = getattr(test, asynctest._fail_on._FAIL_ON_ATTR, None)
+        self._checker = checker or asynctest._fail_on._fail_on()
+        self._checker.before_test(self)
+
         if asyncio.iscoroutinefunction(self.setUp):
             self.loop.run_until_complete(self.setUp())
         else:
             self.setUp()
 
         # don't take into account if the loop ran during setUp
-        self.loop.__asynctest_ran = False
+        self.loop._asynctest_ran = False
 
     def _tearDown(self):
         if asyncio.iscoroutinefunction(self.tearDown):
             self.loop.run_until_complete(self.tearDown())
         else:
             self.tearDown()
+
+        # post-test checks
+        self._checker.check_test(self)
 
     # Override unittest.TestCase methods which call setUp() and tearDown()
     def run(self, result=None):
@@ -314,26 +319,11 @@ class TestCase(unittest.case.TestCase):
             function(*args, **kwargs)
 
     def _run_test_method(self, method):
-        fail_checks = self._get_fail_checks(method)
         # If the method is a coroutine or returns a coroutine, run it on the
         # loop
         result = method()
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
-        elif fail_checks['unused_loop']:
-            if not self.loop.__asynctest_ran:
-                self.fail("Loop did not run during the test")
-        if fail_checks['active_handles']:
-            live_handles = tuple(self._live_timer_handles)
-            if live_handles:
-                self.fail('Loop contained unfinished work {}'.format(
-                    live_handles))
-
-    def _get_fail_checks(self, method):
-        checks = _FAIL_DEFAULTS.copy()
-        checks.update(getattr(self, _FAIL_CHECK_ATTR, {}))
-        checks.update(getattr(method, _FAIL_CHECK_ATTR, {}))
-        return checks
 
     def addCleanup(self, function, *args, **kwargs):
         """
@@ -355,25 +345,75 @@ class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
 
 
-_FAIL_DEFAULTS = {
-    'unused_loop': True,
-    'active_handles': False
-}
-_FAIL_CHECK_ATTR = '_fail_on_checks'
+class ClockedTestCase(TestCase):
+    """
+    Subclass of :class:`~asynctest.TestCase` with a controlled loop clock,
+    useful for testing timer based behaviour without slowing test run time.
+    """
+    def _init_loop(self):
+        super()._init_loop()
+        self.loop.time = functools.wraps(self.loop.time)(lambda: self._time)
+        self._time = 0
+
+    @asyncio.coroutine
+    def advance(self, seconds):
+        """
+        Fast forward time by a number of ``seconds``.
+
+        Callbacks scheduled to run up to the destination clock time will be
+        executed on time:
+
+        >>> self.loop.call_later(1, print_time)
+        >>> self.loop.call_later(2, self.loop.call_later, 1, print_time)
+        >>> await self.advance(3)
+        1
+        3
+
+        In this example, the third callback is scheduled at ``t = 2`` to be
+        executed at ``t + 1``. Hence, it will run at ``t = 3``. The callback as
+        been called on time.
+        """
+        if seconds < 0:
+            raise ValueError(
+                'Cannot go back in time ({} seconds)'.format(seconds))
+
+        yield from self._drain_loop()
+
+        target_time = self._time + seconds
+        while True:
+            next_time = self._next_scheduled()
+            if next_time is None or next_time > target_time:
+                break
+
+            self._time = next_time
+            yield from self._drain_loop()
+
+        self._time = target_time
+        yield from self._drain_loop()
+
+    def _next_scheduled(self):
+        try:
+            return self.loop._scheduled[0]._when
+        except IndexError:
+            return None
+
+    @asyncio.coroutine
+    def _drain_loop(self):
+        while True:
+            next_time = self._next_scheduled()
+            if not self.loop._ready and (next_time is None or
+                                         next_time > self._time):
+                break
+
+            yield from asyncio.sleep(0)
+            self.loop._TestCase_asynctest_ran = True
 
 
-def fail_on(**kwargs):
-    invalid_kwargs = {k for k in kwargs if k not in _FAIL_DEFAULTS}
-    if invalid_kwargs:
-        raise TypeError('Invalid keyword arguments {}'.format(invalid_kwargs))
-
-    def decorate(func_or_class):
-        opts = getattr(func_or_class, _FAIL_CHECK_ATTR, {})
-        opts.update(kwargs)
-        setattr(func_or_class, _FAIL_CHECK_ATTR, opts)
-        return func_or_class
-    return decorate
-
-
-def ignore_loop(test):
-    return fail_on(unused_loop=False)(test)
+def ignore_loop(func=None):
+    """
+    Ignore the error case where the loop did not run during the test.
+    """
+    warnings.warn("ignore_loop() is deprected in favor of "
+                  "fail_on(unused_loop=False)", DeprecationWarning)
+    checker = asynctest._fail_on._fail_on({"unused_loop": False})
+    return checker if func is None else checker(func)

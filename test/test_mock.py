@@ -34,7 +34,11 @@ class Test:
     def is_patched(self):
         return False
 
-    a_dict = {'is_patched': False}
+    def second_is_patched(self):
+        return False
+
+    a_dict = {'is_patched': False, 'second_is_patched': False}
+    a_second_dict = {'is_patched': False}
 
 if _using_await:
     Test = _using_await.patch_Test_Class(Test)
@@ -43,6 +47,22 @@ if _using_await:
 patch_is_patched = functools.partial(asynctest.mock.patch,
                                      'test.test_mock.Test.is_patched',
                                      new=lambda self: True)
+
+patch_second_is_patched = functools.partial(
+    asynctest.mock.patch, 'test.test_mock.Test.second_is_patched',
+    new=lambda self: True)
+
+patch_dict_is_patched = functools.partial(
+    asynctest.mock.patch.dict, 'test.test_mock.Test.a_dict',
+    values={"is_patched": True})
+
+patch_dict_second_is_patched = functools.partial(
+    asynctest.mock.patch.dict, 'test.test_mock.Test.a_dict',
+    values={"second_is_patched": True})
+
+patch_dict_second_dict_is_patched = functools.partial(
+    asynctest.mock.patch.dict, 'test.test_mock.Test.a_second_dict',
+    values={"is_patched": True})
 
 
 def inject_class(obj):
@@ -243,21 +263,29 @@ for child, parent in TestMockInheritanceModel.to_test.items():
             'test_{}_inherits_from_{}'.format(child, parent),
             TestMockInheritanceModel.make_inheritance_test(child, parent))
 
+#
+# mock_open()
+#
+
 
 class Test_mock_open(unittest.TestCase):
     def test_MagicMock_returned_by_default(self):
         self.assertIsInstance(asynctest.mock_open(), asynctest.MagicMock)
 
+#
+# Test patches
+#
+
 
 class Test_patch(unittest.TestCase):
-    def test_patch_with_MagicMock(self):
+    def test_patch_as_context_manager_uses_MagicMock(self):
         with asynctest.mock.patch('test.test_mock.Test') as mock:
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
         with asynctest.mock.patch('test.test_mock.Test.a_function') as mock:
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
-    def test_patch_decorate_with_MagicMock(self):
+    def test_patch_as_decorator_uses_MagicMock(self):
         @asynctest.mock.patch('test.test_mock.Test')
         def test_mock_class(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
@@ -269,26 +297,32 @@ class Test_patch(unittest.TestCase):
         test_mock_class()
         test_mock_function()
 
-    def test_patch_decorate_coroutine_function_with_CoroutineMock(self):
+    def test_patch_as_decorator_uses_CoroutineMock_on_coroutine_function(self):
         @asynctest.mock.patch('test.test_mock.Test.a_coroutine')
         def test_mock_coroutine(mock):
             self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
         test_mock_coroutine()
 
+    def test_patch_as_context_manager_uses_CoroutineMock_on_coroutine_function(self):
+        with asynctest.mock.patch('test.test_mock.Test.a_coroutine'):
+            import test.test_mock
+            self.assertIsInstance(test.test_mock.Test.a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
     if _using_await:
-        def test_patch_async_coroutine_function_with_CoroutineMock(self):
+        def test_patch_as_context_manager_uses_CoroutineMock_on_async_coroutine_function(self):
             with asynctest.mock.patch('test.test_mock.Test.an_async_coroutine') as mock:
                 self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
-        def test_patch_decorate_async_coroutine_function_with_CoroutineMock(self):
+        def test_patch_as_decorator_uses_CoroutineMock_on__async_coroutine_function(self):
             @asynctest.mock.patch('test.test_mock.Test.an_async_coroutine')
             def test_mock_coroutine(mock):
                 self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
 
             test_mock_coroutine()
 
-    def test_patch_decorates_coroutine(self):
+    def test_patch_is_enabled_when_running_decorated_coroutine(self):
         @asyncio.coroutine
         def a_coroutine():
             import test.test_mock
@@ -302,7 +336,7 @@ class Test_patch(unittest.TestCase):
             with self.subTest(coroutine=coroutine):
                 self.assertTrue(run_coroutine(patch_is_patched()(coroutine)()))
 
-    def test_patch_decorates_function(self):
+    def test_patch_is_enabled_when_running_decorated_function(self):
         @patch_is_patched()
         def a_function():
             import test.test_mock
@@ -312,17 +346,6 @@ class Test_patch(unittest.TestCase):
 
 
 class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
-    def test_generator_type_when_patched(self):
-        def a_generator():
-            yield
-
-        a_patched_generator = patch_is_patched()(a_generator)
-
-        self.assertTrue(inspect.isgeneratorfunction(a_generator))
-        self.assertTrue(inspect.isgenerator(a_generator()))
-        self.assertEqual(asyncio.iscoroutinefunction(a_patched_generator),
-                         asyncio.iscoroutinefunction(a_generator))
-
     def test_coroutine_type_when_patched(self):
         @asyncio.coroutine
         def a_coroutine():
@@ -358,54 +381,6 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
         finally:
             run_coroutine(coro)
             run_coroutine(patched_coro)
-
-    def is_patched(self):
-        import test.test_mock
-        return test.test_mock.Test().is_patched()
-
-    def test_patch_generator_only_when_running(self):
-        @patch_is_patched()
-        def a_generator():
-            yield self.is_patched()
-            yield self.is_patched()
-
-        gen = a_generator()
-        self.assertTrue(next(gen))
-        self.assertFalse(self.is_patched())
-        self.assertTrue(next(gen))
-
-    def test_patch_coroutine_only_when_running(self):
-        def set_fut_result(fut):
-            fut.set_result(self.is_patched())
-
-        @asyncio.coroutine
-        def tester(coro_function):
-            loop = asyncio.get_event_loop()
-            fut = asyncio.Future(loop=loop)
-            loop.call_soon(set_fut_result, fut)
-            before, after = yield from coro_function(fut)
-            self.assertTrue(before)
-            self.assertFalse(fut.result())
-            self.assertTrue(after)
-
-        with self.subTest("old style coroutine"):
-            @patch_is_patched()
-            def a_coroutine(fut):
-                before = self.is_patched()
-                yield from fut
-                after = self.is_patched()
-                return before, after
-
-            run_coroutine(tester(a_coroutine))
-
-        if not _using_await:
-            return
-
-        with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                self.is_patched)
-            a_new_style_coroutine = patch_is_patched()(a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
 
     def test_generator_arg_is_default_mock(self):
         @asynctest.mock.patch('test.test_mock.Test')
@@ -517,7 +492,8 @@ class Test_patch_multiple(unittest.TestCase):
             self.assertIsInstance(obj.a_coroutine, asynctest.mock.CoroutineMock)
 
             if _using_await:
-                self.assertIsInstance(obj.an_async_coroutine, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(obj.an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
 
     def test_patch_decorates_coroutine(self):
         patch = functools.partial(asynctest.mock.patch.multiple,
@@ -540,10 +516,6 @@ class Test_patch_multiple(unittest.TestCase):
 
 class Test_patch_dict(unittest.TestCase):
     def test_patch_decorates_coroutine(self):
-        patch = functools.partial(asynctest.mock.patch.dict,
-                                  'test.test_mock.Test.a_dict',
-                                  is_patched=True)
-
         @asyncio.coroutine
         def a_coroutine():
             import test.test_mock
@@ -556,15 +528,686 @@ class Test_patch_dict(unittest.TestCase):
 
         for coroutine in coroutines:
             with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
+                self.assertTrue(run_coroutine(patch_dict_is_patched()(coroutine)()))
 
     def test_patch_decorates_function(self):
-        @asynctest.mock.patch.dict('test.test_mock.Test.a_dict', is_patched=True)
+        @patch_dict_is_patched()
         def a_function():
             import test.test_mock
             return test.test_mock.Test().a_dict['is_patched']
 
         self.assertTrue(a_function())
+
+    def test_patch_decorates_class(self):
+        import test.test_mock
+
+        @patch_dict_is_patched()
+        class Patched:
+            @asyncio.coroutine
+            def test_a_coroutine(self):
+                return test.test_mock.Test().a_dict['is_patched']
+
+            def test_a_function(self):
+                return test.test_mock.Test().a_dict['is_patched']
+
+        instance = Patched()
+        self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
+        self.assertTrue(instance.test_a_function())
+        self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
+        self.assertTrue(run_coroutine(instance.test_a_coroutine()))
+        self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
+
+
+#
+# patch scopes
+#
+
+
+class patch_scope_TestCase(unittest.TestCase):
+    def is_patched(self):
+        import test.test_mock
+        return test.test_mock.Test().is_patched()
+
+    def second_is_patched(self):
+        import test.test_mock
+        return test.test_mock.Test().second_is_patched()
+
+    def _test_deactivate_patch_when_generator_init_fails(self, scope):
+        @patch_is_patched(scope=scope)
+        def a_generator(wrong_number_of_args):
+            yield
+
+        try:
+            gen = a_generator()
+            next(gen)
+            self.fail("Exception must raise")
+        except TypeError:
+            pass
+
+        self.assertFalse(self.is_patched())
+
+    def _test_deactivate_patch_when_generator_exec_fails(self, scope):
+        @patch_is_patched(scope=scope)
+        @asyncio.coroutine
+        def a_coroutine(missing_arg):
+            return
+
+        with self.subTest("old style coroutine"):
+            @asyncio.coroutine
+            def tester():
+                try:
+                    yield from a_coroutine()
+                    self.fail("Exception must raise")
+                except TypeError:
+                    pass
+
+                self.assertFalse(self.is_patched())
+
+            run_coroutine(tester())
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                lambda missing_arg: None)
+            a_new_style_coroutine = patch_is_patched(scope=scope)(
+                a_new_style_coroutine)
+
+            @asyncio.coroutine
+            def tester():
+                try:
+                    yield from a_new_style_coroutine()
+                    self.fail("Exception must raise")
+                except TypeError:
+                    pass
+
+                self.assertFalse(self.is_patched())
+
+            run_coroutine(tester())
+
+
+class patch_dict_scope_TestCase(unittest.TestCase):
+    def is_patched(self):
+        import test.test_mock
+        return test.test_mock.Test().a_dict['is_patched']
+
+    def second_is_patched(self):
+        import test.test_mock
+        return test.test_mock.Test().a_dict['second_is_patched']
+
+    def second_dict_is_patched(self):
+        import test.test_mock
+        return test.test_mock.Test().a_second_dict['is_patched']
+
+
+class Test_patch_dict_decorator_coroutine_or_generator_scope(
+        patch_dict_scope_TestCase):
+    def test_default_scope_is_global(self):
+        @patch_dict_is_patched()
+        def a_generator():
+            yield self.is_patched()
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        self.assertTrue(next(gen))
+
+    def test_scope_limited(self):
+        @patch_dict_is_patched(scope=asynctest.LIMITED)
+        def a_generator():
+            yield self.is_patched()
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertFalse(self.is_patched())
+        self.assertTrue(next(gen))
+
+    def test_patch_generator_with_multiple_scopes(self):
+        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
+            def a_generator():
+                yield (self.is_patched(), self.second_dict_is_patched())
+                yield (self.is_patched(), self.second_dict_is_patched())
+
+            gen = a_generator()
+            self.assertEqual((True, True), next(gen))
+            self.assertEqual(
+                (True, False),
+                (self.is_patched(), self.second_dict_is_patched()))
+            self.assertEqual((True, True), next(gen))
+
+        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
+            def a_generator():
+                yield (self.is_patched(), self.second_dict_is_patched())
+                yield (self.is_patched(), self.second_dict_is_patched())
+
+            gen = a_generator()
+            self.assertEqual((True, True), next(gen))
+            self.assertEqual(
+                (False, True),
+                (self.is_patched(), self.second_dict_is_patched()))
+            self.assertEqual((True, True), next(gen))
+
+    def test_patch_generator_with_multiple_scopes_on_same_dict(self):
+        import test.test_mock
+
+        def tester():
+            test.test_mock.Test.a_dict['overriden_value'] = True
+            for _ in range(2):
+                yield (
+                    self.is_patched(), self.second_is_patched(),
+                    test.test_mock.Test.a_dict.get('overriden_value', False))
+
+        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @patch_dict_second_is_patched(scope=asynctest.LIMITED)
+            def a_generator():
+                yield from tester()
+
+            gen = a_generator()
+            self.assertEqual((True, True, True), next(gen))
+            self.assertEqual((True, False),
+                             (self.is_patched(), self.second_is_patched()))
+            self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
+            self.assertEqual((True, True, True), next(gen))
+
+        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            @patch_dict_second_is_patched(scope=asynctest.GLOBAL)
+            def a_generator():
+                yield from tester()
+
+            gen = a_generator()
+            self.assertEqual((True, True, True), next(gen))
+            self.assertEqual((False, True),
+                             (self.is_patched(), self.second_is_patched()))
+            self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
+            self.assertEqual((True, True, True), next(gen))
+
+    def test_patch_coroutine_with_multiple_scopes(self):
+        def tester():
+            return (self.is_patched(), self.second_dict_is_patched())
+
+        @asyncio.coroutine
+        def tester_couroutine(future):
+            before = tester()
+            yield from future
+            after = tester()
+            return before, after
+
+        def run_test(a_coroutine):
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            try:
+                future = asyncio.Future(loop=loop)
+                task = loop.create_task(a_coroutine(future))
+                loop.call_soon(lambda: future.set_result(tester()))
+                before, after = loop.run_until_complete(task)
+            finally:
+                loop.close()
+
+            return before, future.result(), after
+
+        with self.subTest("old style coroutine - Outher: GLOBAL, inner: LIMITED"):
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
+            @asyncio.coroutine
+            def a_coroutine(future):
+                return (yield from tester_couroutine(future))
+
+            before, between, after = run_test(a_coroutine)
+            self.assertEqual((True, True), before)
+            self.assertEqual((True, False), between)
+            self.assertEqual((True, True), after)
+
+        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
+            @asyncio.coroutine
+            def a_coroutine(future):
+                return (yield from tester_couroutine(future))
+
+            before, between, after = run_test(a_coroutine)
+            self.assertEqual((True, True), before)
+            self.assertEqual((False, True), between)
+            self.assertEqual((True, True), after)
+
+        if not _using_await:
+            return
+
+        tester_coroutine = _using_await.build_simple_coroutine(tester)
+
+        with self.subTest("new style coroutine - Outher: GLOBAL, inner: LIMITED"):
+            a_coroutine = patch_dict_is_patched(scope=asynctest.GLOBAL)(
+                patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)(
+                    tester_coroutine))
+
+            before, between, after = run_test(a_coroutine)
+            self.assertEqual((True, True), before)
+            self.assertEqual((True, False), between)
+            self.assertEqual((True, True), after)
+
+        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+            a_coroutine = patch_dict_is_patched(scope=asynctest.LIMITED)(
+                patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)(
+                    tester_coroutine))
+
+            before, between, after = run_test(a_coroutine)
+            self.assertEqual((True, True), before)
+            self.assertEqual((False, True), between)
+            self.assertEqual((True, True), after)
+
+
+class Test_patch_and_patch_dict_scope(unittest.TestCase):
+    def test_both_patch_and_patch_dict_with_scope_global(self):
+        def test_result():
+            import test.test_mock
+            instance = test.test_mock.Test()
+            return (instance.is_patched(), instance.a_dict['is_patched'])
+
+        with self.subTest("patch and patch.dict"):
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            @asyncio.coroutine
+            def a_coroutine():
+                return test_result()
+
+            self.assertEqual((True, True), run_coroutine(a_coroutine()))
+
+        with self.subTest("patch.dict and patch"):
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @asyncio.coroutine
+            def a_coroutine():
+                return test_result()
+
+            self.assertEqual((True, True), run_coroutine(a_coroutine()))
+
+    def test_both_patch_and_patch_dict_with_scope_limited(self):
+        import test.test_mock
+        instance = test.test_mock.Test()
+
+        def test_result(instance):
+            yield (instance.is_patched(), instance.a_dict['is_patched'])
+            yield (instance.is_patched(), instance.a_dict['is_patched'])
+
+        with self.subTest("patch and patch.dict"):
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.LIMITED)
+            def a_generator(instance):
+                yield from test_result(instance)
+
+            gen = a_generator(instance)
+            self.assertEqual((True, True), next(gen))
+            self.assertEqual((False, False),
+                             (instance.is_patched(),
+                              instance.a_dict['is_patched']))
+            self.assertEqual((True, True), next(gen))
+
+        with self.subTest("patch.dict and patch"):
+            @patch_is_patched(scope=asynctest.LIMITED)
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            def a_generator(instance):
+                yield from test_result(instance)
+
+            gen = a_generator(instance)
+            self.assertEqual((True, True), next(gen))
+            self.assertEqual((False, False),
+                             (instance.is_patched(),
+                              instance.a_dict['is_patched']))
+            self.assertEqual((True, True), next(gen))
+
+
+class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
+    # Tests of patch() related to the use of scope=*, with several scopes used
+    def test_default_scope_is_global(self):
+        @patch_is_patched()
+        def a_generator():
+            yield self.is_patched()
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        self.assertTrue(next(gen))
+
+    def test_patch_generator_with_multiple_scopes(self):
+        def a_generator():
+            yield (self.is_patched(), self.second_is_patched())
+            yield (self.is_patched(), self.second_is_patched())
+
+        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            def patched():
+                yield from a_generator()
+
+            gen = patched()
+            self.assertEqual((True, True), next(gen))
+            self.assertTrue(self.is_patched())
+            self.assertFalse(self.second_is_patched())
+            self.assertEqual((True, True), next(gen))
+
+        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            def patched():
+                yield from a_generator()
+
+            gen = patched()
+            self.assertEqual((True, True), next(gen))
+            self.assertTrue(self.is_patched())
+            self.assertFalse(self.second_is_patched())
+            self.assertEqual((True, True), next(gen))
+
+    def test_patch_coroutine_with_multiple_scopes(self):
+        def set_fut_result(fut):
+            fut.set_result((self.is_patched(), self.second_is_patched()))
+
+        @asyncio.coroutine
+        def tester(coro_function):
+            loop = asyncio.get_event_loop()
+            fut = asyncio.Future(loop=loop)
+            loop.call_soon(set_fut_result, fut)
+            before, after = yield from coro_function(fut)
+            self.assertEqual((True, True), before)
+            self.assertEqual((True, False), fut.result())
+            self.assertEqual((True, True), after)
+            self.assertFalse(self.is_patched())
+            self.assertFalse(self.second_is_patched())
+
+        with self.subTest("old style coroutine - Outher: GLOBAL, inner: LIMITED"):
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            def a_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                yield from fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            def a_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                yield from fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine - Outher: GLOBAL, inner: LIMITED"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                lambda: (self.is_patched(), self.second_is_patched()))
+            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
+                a_new_style_coroutine)
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
+
+        with self.subTest("new style coroutine - Outher: LIMITED, inner: GLOBAL"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                lambda: (self.is_patched(), self.second_is_patched()))
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
+                a_new_style_coroutine)
+            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
+
+
+class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestCase):
+    # Tests of patch() using scope=GLOBAL
+    def test_deactivate_patch_when_generator_init_fails(self):
+        self._test_deactivate_patch_when_generator_init_fails(asynctest.GLOBAL)
+
+    def test_deactivate_patch_when_generator_exec_fails(self):
+        self._test_deactivate_patch_when_generator_exec_fails(asynctest.GLOBAL)
+
+    def test_patch_generator_during_its_lifetime(self):
+        @patch_is_patched(scope=asynctest.GLOBAL)
+        def a_generator():
+            yield self.is_patched()
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        self.assertTrue(next(gen))
+        # exhaust the generator
+        try:
+            next(gen)
+            self.fail("Coroutine must be stopped")
+        except StopIteration:
+            pass
+        self.assertFalse(self.is_patched())
+
+    def test_patch_coroutine_during_its_lifetime(self):
+        def set_fut_result(fut):
+            fut.set_result(self.is_patched())
+
+        @asyncio.coroutine
+        def tester(coro_function):
+            loop = asyncio.get_event_loop()
+            fut = asyncio.Future(loop=loop)
+            loop.call_soon(set_fut_result, fut)
+            before, after = yield from coro_function(fut)
+            self.assertTrue(before)
+            self.assertTrue(fut.result())
+            self.assertTrue(after)
+            self.assertFalse(self.is_patched())
+
+        with self.subTest("old style coroutine"):
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            def a_coroutine(fut):
+                before = self.is_patched()
+                yield from fut
+                after = self.is_patched()
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                self.is_patched)
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
+
+    # It's really hard to test this behavior for a coroutine, but I assume it's
+    # fine as long as the implementation is shared with a generator. Also, it's
+    # really hard to fall in a case like this one with a coroutine.
+    def test_patch_stopped_when_generator_is_collected(self):
+        @patch_is_patched(scope=asynctest.GLOBAL)
+        def a_generator():
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        del gen
+        self.assertFalse(self.is_patched())
+
+    def test_multiple_patches_on_generator(self):
+        @patch_second_is_patched(scope=asynctest.GLOBAL)
+        @patch_is_patched(scope=asynctest.GLOBAL)
+        def a_generator():
+            yield self.is_patched() and self.second_is_patched()
+            yield self.is_patched() and self.second_is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        self.assertTrue(self.second_is_patched())
+        self.assertTrue(next(gen))
+        # exhaust the generator
+        try:
+            next(gen)
+            self.fail("Coroutine must be stopped")
+        except StopIteration:
+            pass
+        self.assertFalse(self.is_patched())
+        self.assertFalse(self.second_is_patched())
+
+    def test_multiple_patches_on_coroutine(self):
+        def set_fut_result(fut):
+            fut.set_result((self.is_patched(), self.second_is_patched()))
+
+        @asyncio.coroutine
+        def tester(coro_function):
+            loop = asyncio.get_event_loop()
+            fut = asyncio.Future(loop=loop)
+            loop.call_soon(set_fut_result, fut)
+            before, after = yield from coro_function(fut)
+            self.assertEqual((True, True), before)
+            self.assertEqual((True, True), fut.result())
+            self.assertEqual((True, True), after)
+            self.assertFalse(self.is_patched())
+            self.assertFalse(self.second_is_patched())
+
+        with self.subTest("old style coroutine"):
+            @patch_second_is_patched(scope=asynctest.GLOBAL)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            def a_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                yield from fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                lambda: (self.is_patched(), self.second_is_patched()))
+            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.GLOBAL)(
+                a_new_style_coroutine)
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
+
+
+class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_TestCase):
+    # Tests of patch() using scope=LIMITED
+    def test_deactivate_patch_when_generator_init_fails(self):
+        self._test_deactivate_patch_when_generator_init_fails(asynctest.LIMITED)
+
+    def test_deactivate_patch_when_generator_exec_fails(self):
+        self._test_deactivate_patch_when_generator_exec_fails(asynctest.LIMITED)
+
+    def test_patch_generator_only_when_running(self):
+        @patch_is_patched(scope=asynctest.LIMITED)
+        def a_generator():
+            yield self.is_patched()
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertFalse(self.is_patched())
+        self.assertTrue(next(gen))
+
+    def test_patch_coroutine_only_when_running(self):
+        def set_fut_result(fut):
+            fut.set_result(self.is_patched())
+
+        @asyncio.coroutine
+        def tester(coro_function):
+            loop = asyncio.get_event_loop()
+            fut = asyncio.Future(loop=loop)
+            loop.call_soon(set_fut_result, fut)
+            before, after = yield from coro_function(fut)
+            self.assertTrue(before)
+            self.assertFalse(fut.result())
+            self.assertTrue(after)
+
+        with self.subTest("old style coroutine"):
+            @patch_is_patched(scope=asynctest.LIMITED)
+            def a_coroutine(fut):
+                before = self.is_patched()
+                yield from fut
+                after = self.is_patched()
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                self.is_patched)
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.LIMITED)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
+
+    def test_patched_coroutine_with_mock_args(self):
+        @asynctest.mock.patch('test.test_mock.Test', side_effect=lambda: None,
+                              scope=asynctest.LIMITED)
+        @asyncio.coroutine
+        def a_coroutine(mock):
+            loop = asyncio.get_event_loop()
+            self.assertIs(mock, Test)
+            yield from asyncio.sleep(0, loop=loop)
+            self.assertIs(mock, Test)
+            yield from asyncio.sleep(0, loop=loop)
+            self.assertIs(mock, Test)
+
+        run_coroutine(a_coroutine())
+
+    def test_multiple_patches_on_coroutine(self):
+        def set_fut_result(fut):
+            fut.set_result((self.is_patched(), self.second_is_patched()))
+
+        @asyncio.coroutine
+        def tester(coro_function):
+            loop = asyncio.get_event_loop()
+            fut = asyncio.Future(loop=loop)
+            loop.call_soon(set_fut_result, fut)
+            before, after = yield from coro_function(fut)
+            self.assertEqual((True, True), before)
+            self.assertEqual((False, False), fut.result())
+            self.assertEqual((True, True), after)
+            self.assertFalse(self.is_patched())
+            self.assertFalse(self.second_is_patched())
+
+        with self.subTest("old style coroutine"):
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.LIMITED)
+            def a_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                yield from fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_coroutine))
+
+        if not _using_await:
+            return
+
+        with self.subTest("new style coroutine"):
+            a_new_style_coroutine = _using_await.build_simple_coroutine(
+                lambda: (self.is_patched(), self.second_is_patched()))
+            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
+                a_new_style_coroutine)
+            a_new_style_coroutine = patch_is_patched(scope=asynctest.LIMITED)(
+                a_new_style_coroutine)
+            run_coroutine(tester(a_new_style_coroutine))
 
 
 class Test_return_once(unittest.TestCase):

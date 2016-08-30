@@ -11,11 +11,18 @@ can simulate the behavior of a selector on the mock objects, or forward actual
 work to a real selector.
 """
 
-import selectors
+import asyncio
+try:
+    import selectors
+except ImportError:
+    # In the case of Python 3.3, attempt to use the selectors
+    # modules from within the asyncio package
+    import asyncio.selectors as selectors
 import socket
 import ssl
 
 from . import mock
+from . import _fail_on
 
 
 class FileDescriptor(int):
@@ -177,10 +184,9 @@ def set_write_ready(fileobj, loop):
     data can be written to ``fileobj``.
 
     :param fileobj: file obkect or  :class:`~asynctest.FileMock` on which th
-    event is mocked.
-
+        event is mocked.
     :param loop: :class:`asyncio.SelectorEventLoop` watching for events on
-    ``fileobj``.
+        ``fileobj``.
 
     .. versionadded:: 0.4
     """
@@ -194,9 +200,7 @@ class TestSelector(selectors._BaseSelectorImpl):
     It can wrap an actual implementation of a selector, so the selector will
     work both with mocks and real file-like objects.
 
-    A common use case is to patch the selector loop:
-
-    ::
+    A common use case is to patch the selector loop::
 
         loop._selector = asynctest.TestSelector(loop._selector)
 
@@ -300,3 +304,59 @@ class TestSelector(selectors._BaseSelectorImpl):
             self._selector.close()
 
         super().close()
+
+
+def get_registered_events(selector):
+    watched_events = []
+    for event in selector.get_map().values():
+        watched_events.append(event)
+
+    if selector._selector is not None:
+        # this is our TestSelector, wrapping a true selector object
+        for event in selector._selector.get_map().values():
+            watched_events.append(event)
+
+    return set(watched_events)
+
+
+def _format_callback(handle):
+    return asyncio.events._format_callback(handle._callback, handle._args)
+
+
+def _format_event(event):
+    callbacks = []
+
+    if event.events & selectors.EVENT_READ:
+        callbacks.append("add_reader({}, {})".format(
+            event.fileobj, _format_callback(event.data[0])))
+
+    if event.events & selectors.EVENT_WRITE:
+        callbacks.append("add_writer({}, {})".format(
+            event.fileobj, _format_callback(event.data[1])))
+
+    return callbacks
+
+
+@staticmethod
+def fail_on_before_test_active_selector_callbacks(case):
+    case._active_selector_callbacks = get_registered_events(
+        case.loop._selector)
+
+
+@staticmethod
+def fail_on_active_selector_callbacks(case):
+    ignored_events = case._active_selector_callbacks
+    active_events = get_registered_events(case.loop._selector)
+
+    output = ["some events watched during the tests were not removed:"]
+    for c in map(_format_event, active_events - ignored_events):
+        output.extend(c)
+
+    if len(output) > 1:
+        case.fail("\n - ".join(output))
+
+
+_fail_on.DEFAULTS["active_selector_callbacks"] = False
+_fail_on._fail_on.active_selector_callbacks = fail_on_active_selector_callbacks
+_fail_on._fail_on.before_test_active_selector_callbacks = \
+    fail_on_before_test_active_selector_callbacks

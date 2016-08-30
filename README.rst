@@ -14,6 +14,8 @@ Author & license
 Authored by Martin Richard <martius@martiusweb.net> and licensed under the
 Apache 2 license.
 
+See the AUTHORS file for a comprehensive list of the authors.
+
 Documentation
 -------------
 
@@ -25,8 +27,8 @@ Full documentation is available at http://asynctest.readthedocs.org/en/latest/,
 Features
 --------
 
-TestCase and FunctionTestCase
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+TestCases
+~~~~~~~~~
 
   - Initialize and close a loop created for each test (it can be
     configurated), if the loop uses a selector, it will be updated with
@@ -37,7 +39,11 @@ TestCase and FunctionTestCase
 
   - TestCase.setUp() and TestCase.tearDown() can be coroutine functions,
 
-  - a test fails if the loop did not run during the test.
+  - control post-test checks with `@fail_on`, for instance, the test fail if
+    the loop didn't run, some optional checks can be activated,
+
+  - ClockedTestCase allows to control the loop clock and run timed events
+    without waiting the wall clock.
 
 
 Mock and CoroutineMock
@@ -53,7 +59,8 @@ Mock and CoroutineMock
   - patch(), patch.object(), patch.multiple() return a MagickMock or
     CoroutineMock object by default, according to the patched target,
 
-  - patch(), patch.object(), patch.multiple() handle generators and coroutines,
+  - patch(), patch.object(), patch.multiple() handle generators and coroutines
+    and their behavior can be controled when the generator or coroutine pauses,
 
   - all the patch() methods can decorate coroutine functions,
 
@@ -95,14 +102,13 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
+- mocking of asynchronous iterators and context managers
 - set of warnings against common mistakes
 - proactor support
 
 Tests
 -----
 
-asynctest is unit tested. You can run asynctest test suite with this command:
-
-::
+asynctest is unit tested. You can run asynctest test suite with this command::
 
 $ PYTHONPATH=. python -m unittest test
