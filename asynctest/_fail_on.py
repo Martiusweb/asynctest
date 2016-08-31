@@ -6,6 +6,7 @@ tests.
 This module is separated from :mod:`asynctest.case` to avoid circular imports
 in modules registering new checks.
 """
+from asyncio import TimerHandle
 
 
 _FAIL_ON_ATTR = "_asynctest_fail_on"
@@ -13,6 +14,7 @@ _FAIL_ON_ATTR = "_asynctest_fail_on"
 
 DEFAULTS = {
     "unused_loop": True,
+    "active_handles": False,
 }
 
 
@@ -76,6 +78,20 @@ class _fail_on:
     def unused_loop(case):
         if not case.loop._asynctest_ran:
             case.fail("Loop did not run during the test")
+
+    @staticmethod
+    def _is_live_timer_handle(handle):
+        return isinstance(handle, TimerHandle) and not handle._cancelled
+
+    @classmethod
+    def _live_timer_handles(cls, loop):
+        return filter(cls._is_live_timer_handle, loop._scheduled)
+
+    @classmethod
+    def active_handles(cls, case):
+        handles = tuple(cls._live_timer_handles(case.loop))
+        if handles:
+            case.fail("Loop contained unfinished work {!r}".format(handles))
 
 
 def fail_on(**kwargs):

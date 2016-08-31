@@ -230,6 +230,19 @@ class Test_TestCase(_TestCase):
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
+    def test_fails_when_future_has_scheduled_calls(self):
+        class CruftyTest(asynctest.TestCase):
+            @asynctest.fail_on(active_handles=True, unused_loop=False)
+            def runTest(instance):
+                instance.loop.call_later(5, lambda: None)
+
+        with self.subTest(method='debug'):
+            with self.assertRaisesRegex(AssertionError, 'unfinished work'):
+                CruftyTest().debug()
+        with self.subTest(method='run'):
+            result = CruftyTest().run()
+            self.assertEqual(1, len(result.failures))
+
     def test_setup_teardown_may_be_coroutines(self):
         @asynctest.fail_on(unused_loop=False)
         class WithSetupFunction(Test.FooTestCase):
