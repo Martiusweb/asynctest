@@ -236,9 +236,10 @@ class Test_TestCase(_TestCase):
             def runTest(instance):
                 instance.loop.call_later(5, lambda: None)
 
-        with self.subTest(test=CruftyTest):
+        with self.subTest(method='debug'):
             with self.assertRaisesRegex(AssertionError, 'unfinished work'):
                 CruftyTest().debug()
+        with self.subTest(method='run'):
             result = CruftyTest().run()
             self.assertEqual(1, len(result.failures))
 
