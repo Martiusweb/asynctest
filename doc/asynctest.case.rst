@@ -62,6 +62,12 @@
               unregistered  (with ``remove_reader()`` or ``remove_writer()``)
               before the end of the test.
 
+            * ``active_handles``: disabled by default, checks that there is not
+              scheduled callback left to be executed on the loop at the end of
+              the test. The helper
+              :func:`~asynctest.helpers.exhaust_callbacks()` can help to give
+              a chance to the loop to run pending callbacks.
+
         The decorator of a method has a greater priority than the decorator of
         a class. When :func:`~asynctest.fail_on` decorates a class and one of
         its methods with conflicting arguments, those of the class are
@@ -71,6 +77,9 @@
         checks enabled on the parent class.
 
         .. versionadded:: 0.8
+
+        .. versionadded:: 0.9
+            ``active_handles``
 
     .. decorator:: strict
 
