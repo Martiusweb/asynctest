@@ -320,7 +320,11 @@ def get_registered_events(selector):
 
 
 def _format_callback(handle):
-    return asyncio.events._format_callback(handle._callback, handle._args)
+    if hasattr(asyncio.events, "_format_args_and_kwargs"):
+        return asyncio.events._format_callback(handle._callback, handle._args,
+                                               None)
+    else:
+        return asyncio.events._format_callback(handle._callback, handle._args)
 
 
 def _format_event(event):
