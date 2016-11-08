@@ -173,10 +173,13 @@ class Test_TestCase(_TestCase):
     def test_forbid_get_event_loop(self):
         default_loop = self.create_default_loop()
 
+        # Changed in python 3.6: get_event_loop() returns the running loop in
+        # a callback or a coroutine, so forbid_get_event_loop should only be
+        # forbidden where the loop is not running.
+        @asynctest.lenient
         class Forbid_get_event_loop_TestCase(asynctest.TestCase):
             forbid_get_event_loop = True
 
-            @asyncio.coroutine
             def runTest(self):
                 with self.assertRaises(AssertionError):
                     asyncio.get_event_loop()
