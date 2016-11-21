@@ -26,6 +26,15 @@ else:
     _awaitable = None
 
 
+# From python 3.6, a sentinel object is used to mark coroutines (rather than
+# a boolean) to prevent a mock/proxy object to return a truthy value.
+# see: https://github.com/python/asyncio/commit/ea776a11f632a975ad3ebbb07d8981804aa292db
+try:
+    _is_coroutine = asyncio.coroutines._is_coroutine
+except AttributeError:
+    _is_coroutine = True
+
+
 def _raise(exception):
     raise exception
 
@@ -80,7 +89,8 @@ def _get_is_coroutine(self):
 def _set_is_coroutine(self, value):
     # property setters and getters are overriden by Mock(), we need to
     # update the dict to add values
-    self.__dict__['_mock_is_coroutine'] = bool(value)
+    value = _is_coroutine if bool(value) else False
+    self.__dict__['_mock_is_coroutine'] = value
 
 
 def _mock_add_spec(self, spec, *args, **kwargs):
@@ -288,7 +298,7 @@ class CoroutineMock(Mock):
 
         # asyncio.iscoroutinefunction() checks this property to say if an
         # object is a coroutine
-        self._is_coroutine = True
+        self._is_coroutine = _is_coroutine
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
