@@ -323,7 +323,11 @@ class TestCase(unittest.case.TestCase):
         # loop
         result = method()
         if asyncio.iscoroutine(result):
-            self.loop.run_until_complete(result)
+            @asyncio.coroutine
+            def wrapper():
+              try: yield from result
+              except BaseException as exc: raise
+            self.loop.run_until_complete(wrapper())
 
     def addCleanup(self, function, *args, **kwargs):
         """
