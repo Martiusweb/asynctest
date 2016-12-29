@@ -40,6 +40,7 @@ class Test:
     a_dict = {'is_patched': False, 'second_is_patched': False}
     a_second_dict = {'is_patched': False}
 
+
 if _using_await:
     Test = _using_await.patch_Test_Class(Test)
 
@@ -258,6 +259,7 @@ class TestMockInheritanceModel(unittest.TestCase):
 
         return test
 
+
 for child, parent in TestMockInheritanceModel.to_test.items():
     setattr(TestMockInheritanceModel,
             'test_{}_inherits_from_{}'.format(child, parent),
@@ -286,23 +288,35 @@ class Test_patch(unittest.TestCase):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
     def test_patch_as_decorator_uses_MagicMock(self):
+        called = []
+
         @asynctest.mock.patch('test.test_mock.Test')
         def test_mock_class(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
+            called.append("test_mock_class")
 
         @asynctest.mock.patch('test.test_mock.Test.a_function')
         def test_mock_function(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
+            called.append("test_mock_function")
 
         test_mock_class()
         test_mock_function()
 
+        self.assertIn("test_mock_class", called)
+        self.assertIn("test_mock_function", called)
+
     def test_patch_as_decorator_uses_CoroutineMock_on_coroutine_function(self):
+        called = False
+
         @asynctest.mock.patch('test.test_mock.Test.a_coroutine')
         def test_mock_coroutine(mock):
+            nonlocal called
             self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            called = True
 
         test_mock_coroutine()
+        self.assertTrue(called)
 
     def test_patch_as_context_manager_uses_CoroutineMock_on_coroutine_function(self):
         with asynctest.mock.patch('test.test_mock.Test.a_coroutine'):
