@@ -200,27 +200,52 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
                     self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineMock)
 
 
+@inject_class
+class _Test_Future:
+    # Ensure that a mocked Future is detected as a future
+    def test_mock_a_future_is_a_future(self, klass):
+        mock = klass(asyncio.Future())
+        self.assertIsInstance(mock, asyncio.Future)
+
+    def test_mock_from_create_future(self, klass):
+        loop = asyncio.new_event_loop()
+
+        try:
+            if not (hasattr(loop, "create_future") and
+                    hasattr(asyncio, "isfuture")):
+                return
+
+            mock = klass(loop.create_future())
+            self.assertTrue(asyncio.isfuture(mock))
+        finally:
+            loop.close()
+
+
 class Test_NonCallabableMock(unittest.TestCase, _Test_subclass,
                              _Test_iscoroutinefunction,
                              _Test_is_coroutine_property,
-                             _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                             _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                             _Test_Future):
     class_to_test = 'NonCallableMock'
 
 
 class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
                                 _Test_iscoroutinefunction,
                                 _Test_is_coroutine_property,
-                                _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                                _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                                _Test_Future):
     class_to_test = 'NonCallableMagicMock'
 
 
 class Test_Mock(unittest.TestCase, _Test_subclass,
-                _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                _Test_Future):
     class_to_test = 'Mock'
 
 
 class Test_MagicMock(unittest.TestCase, _Test_subclass,
-                     _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                     _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                     _Test_Future):
     class_to_test = 'MagicMock'
 
 
