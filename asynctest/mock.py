@@ -20,6 +20,20 @@ import sys
 import types
 import unittest.mock
 
+if sys.version_info >= (3, 5):
+    from . import _awaitable
+else:
+    _awaitable = None
+
+
+# From python 3.6, a sentinel object is used to mark coroutines (rather than
+# a boolean) to prevent a mock/proxy object to return a truthy value.
+# see: https://github.com/python/asyncio/commit/ea776a11f632a975ad3ebbb07d8981804aa292db
+try:
+    _is_coroutine = asyncio.coroutines._is_coroutine
+except AttributeError:
+    _is_coroutine = True
+
 
 def _raise(exception):
     raise exception
@@ -75,7 +89,8 @@ def _get_is_coroutine(self):
 def _set_is_coroutine(self, value):
     # property setters and getters are overriden by Mock(), we need to
     # update the dict to add values
-    self.__dict__['_mock_is_coroutine'] = bool(value)
+    value = _is_coroutine if bool(value) else False
+    self.__dict__['_mock_is_coroutine'] = value
 
 
 def _mock_add_spec(self, spec, *args, **kwargs):
@@ -283,7 +298,7 @@ class CoroutineMock(Mock):
 
         # asyncio.iscoroutinefunction() checks this property to say if an
         # object is a coroutine
-        self._is_coroutine = True
+        self._is_coroutine = _is_coroutine
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
@@ -348,25 +363,36 @@ LIMITED = PatchScope.LIMITED
 GLOBAL = PatchScope.GLOBAL
 
 
-def _decorate_callable(func, new_patching):
+def _decorate_coroutine_callable(func, new_patching):
     if hasattr(func, 'patchings'):
         func.patchings.append(new_patching)
         return func
 
+    # Python 3.5 returns True for is_generator_func(new_style_coroutine) if
+    # there is an "await" statement in the function body, which is wrong. It is
+    # fixed in 3.6, but I can't find which commit fixes this.
+    # The only way to work correctly with 3.5 and 3.6 seems to use
+    # inspect.iscoroutinefunction()
     is_generator_func = inspect.isgeneratorfunction(func)
     is_coroutine_func = asyncio.iscoroutinefunction(func)
+    try:
+        is_native_coroutine_func = inspect.iscoroutinefunction(func)
+    except AttributeError:
+        is_native_coroutine_func = False
+
     if not (is_generator_func or is_coroutine_func):
         return None
 
-    @functools.wraps(func)
-    def patched(*args, **keywargs):
+    patchings = [new_patching]
+
+    def patched_factory(*args, **keywargs):
         extra_args = []
         patchers_to_exit = []
         patch_dict_with_limited_scope = []
 
         exc_info = tuple()
         try:
-            for patching in patched.patchings:
+            for patching in patchings:
                 arg = patching.__enter__()
                 if patching.scope == LIMITED:
                     patchers_to_exit.append(patching)
@@ -388,7 +414,7 @@ def _decorate_callable(func, new_patching):
 
             args += tuple(extra_args)
             gen = func(*args, **keywargs)
-            return _PatchedGenerator(gen, patched.patchings,
+            return _PatchedGenerator(gen, patchings,
                                      asyncio.iscoroutinefunction(func))
         except:
             if patching not in patchers_to_exit and _is_started(patching):
@@ -403,23 +429,26 @@ def _decorate_callable(func, new_patching):
             for patching in reversed(patchers_to_exit):
                 patching.__exit__(*exc_info)
 
-    patched.patchings = [new_patching]
-
-    if is_generator_func:
-        # wrap the patched object in a generator so
+    # wrap the factory in a native coroutine  or a generator to respect
+    # introspection.
+    if is_native_coroutine_func:
+        # inspect.iscoroutinefunction() returns True
+        patched = _awaitable.make_native_coroutine(patched_factory)
+    elif is_generator_func:
         # inspect.isgeneratorfunction() returns True
-        @functools.wraps(func)
         def patched_generator(*args, **kwargs):
-            return (yield from patched(*args, **kwargs))
+            return (yield from patched_factory(*args, **kwargs))
 
-        patched_generator.patchings = patched.patchings
+        patched = patched_generator
 
         if is_coroutine_func:
-            return asyncio.coroutine(patched_generator)
-        else:
-            return patched_generator
+            # asyncio.iscoroutinefunction() returns True
+            patched = asyncio.coroutine(patched)
     else:
-        return functools.wraps(func)(patched)
+        patched = patched_factory
+
+    patched.patchings = patchings
+    return functools.wraps(func)(patched)
 
 
 class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
@@ -502,7 +531,7 @@ class _patch(unittest.mock._patch):
             return super().__enter__()
 
     def decorate_callable(self, func):
-        wrapped = _decorate_callable(func, self)
+        wrapped = _decorate_coroutine_callable(func, self)
         if wrapped is None:
             return super().decorate_callable(func)
         else:
@@ -637,7 +666,7 @@ class _patch_dict(unittest.mock._patch_dict):
         if isinstance(func, type):
             return self.decorate_class(func)
 
-        wrapper = _decorate_callable(func, self)
+        wrapper = _decorate_coroutine_callable(func, self)
         if wrapper is None:
             return super().__call__(func)
         else:

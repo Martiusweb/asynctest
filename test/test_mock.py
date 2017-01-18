@@ -40,6 +40,7 @@ class Test:
     a_dict = {'is_patched': False, 'second_is_patched': False}
     a_second_dict = {'is_patched': False}
 
+
 if _using_await:
     Test = _using_await.patch_Test_Class(Test)
 
@@ -199,27 +200,52 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
                     self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineMock)
 
 
+@inject_class
+class _Test_Future:
+    # Ensure that a mocked Future is detected as a future
+    def test_mock_a_future_is_a_future(self, klass):
+        mock = klass(asyncio.Future())
+        self.assertIsInstance(mock, asyncio.Future)
+
+    def test_mock_from_create_future(self, klass):
+        loop = asyncio.new_event_loop()
+
+        try:
+            if not (hasattr(loop, "create_future") and
+                    hasattr(asyncio, "isfuture")):
+                return
+
+            mock = klass(loop.create_future())
+            self.assertTrue(asyncio.isfuture(mock))
+        finally:
+            loop.close()
+
+
 class Test_NonCallabableMock(unittest.TestCase, _Test_subclass,
                              _Test_iscoroutinefunction,
                              _Test_is_coroutine_property,
-                             _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                             _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                             _Test_Future):
     class_to_test = 'NonCallableMock'
 
 
 class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
                                 _Test_iscoroutinefunction,
                                 _Test_is_coroutine_property,
-                                _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                                _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                                _Test_Future):
     class_to_test = 'NonCallableMagicMock'
 
 
 class Test_Mock(unittest.TestCase, _Test_subclass,
-                _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                _Test_Future):
     class_to_test = 'Mock'
 
 
 class Test_MagicMock(unittest.TestCase, _Test_subclass,
-                     _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
+                     _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                     _Test_Future):
     class_to_test = 'MagicMock'
 
 
@@ -258,6 +284,7 @@ class TestMockInheritanceModel(unittest.TestCase):
 
         return test
 
+
 for child, parent in TestMockInheritanceModel.to_test.items():
     setattr(TestMockInheritanceModel,
             'test_{}_inherits_from_{}'.format(child, parent),
@@ -286,23 +313,35 @@ class Test_patch(unittest.TestCase):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
     def test_patch_as_decorator_uses_MagicMock(self):
+        called = []
+
         @asynctest.mock.patch('test.test_mock.Test')
         def test_mock_class(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
+            called.append("test_mock_class")
 
         @asynctest.mock.patch('test.test_mock.Test.a_function')
         def test_mock_function(mock):
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
+            called.append("test_mock_function")
 
         test_mock_class()
         test_mock_function()
 
+        self.assertIn("test_mock_class", called)
+        self.assertIn("test_mock_function", called)
+
     def test_patch_as_decorator_uses_CoroutineMock_on_coroutine_function(self):
+        called = False
+
         @asynctest.mock.patch('test.test_mock.Test.a_coroutine')
         def test_mock_coroutine(mock):
+            nonlocal called
             self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            called = True
 
         test_mock_coroutine()
+        self.assertTrue(called)
 
     def test_patch_as_context_manager_uses_CoroutineMock_on_coroutine_function(self):
         with asynctest.mock.patch('test.test_mock.Test.a_coroutine'):

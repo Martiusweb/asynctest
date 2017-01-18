@@ -98,9 +98,6 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
 
 class TestCase(unittest.case.TestCase):
     """
-    if :meth:`setUp()` and :meth:`tearDown()` are coroutine functions, they
-    will run on the loop.
-
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
 
@@ -121,7 +118,9 @@ class TestCase(unittest.case.TestCase):
 
     If :attr:`~asynctest.TestCase.forbid_get_event_loop` is set to ``True``,
     a call to :func:`asyncio.get_event_loop()` will raise an
-    :exc:`AssertionError`.
+    :exc:`AssertionError`. Since Python 3.6, calling
+    :func:`asyncio.get_event_loop()` from a callback or a coroutine will return
+    the running loop (instead of raising an exception).
 
     These behaviors should be configured when defining the test case class::
 
@@ -133,6 +132,9 @@ class TestCase(unittest.case.TestCase):
             def test_something(self):
                 pass
 
+    If :meth:`setUp()` and :meth:`tearDown()` are coroutine functions, they
+    will run on the loop. Note that :meth:`setUpClass()` and
+    :meth:`tearDownClass()` can not be coroutines.
 
     .. versionadded:: 0.5
 
