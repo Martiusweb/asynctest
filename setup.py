@@ -10,7 +10,7 @@ from setuptools import setup
 
 args = {
     "name": "asynctest",
-    "version": "0.9.0",
+    "version": "0.10.0",
     "description": "Enhance the standard unittest package with features for "
                    "testing asyncio libraries",
     "author": "Martin Richard",
@@ -25,6 +25,7 @@ args = {
         'License :: OSI Approved :: Apache Software License',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
     "keywords": 'unittest test testing asyncio tulip selectors async mock',
 }
