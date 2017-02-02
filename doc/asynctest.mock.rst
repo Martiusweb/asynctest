@@ -40,7 +40,7 @@
 
         See :func:`~asynctest.patch` and :func:`unittest.mock.patch.object`.
 
-    .. function:: asynctest.patch.mutiple(target, spec=None, create=False, \
+    .. function:: asynctest.patch.multiple(target, spec=None, create=False, \
                     spec_set=None, autospec=None, new_callable=None, \
                     scope=asynctest.global, **kwargs)
 
