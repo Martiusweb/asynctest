@@ -277,14 +277,14 @@ class CoroutineMock(Mock):
       of that function,
     - if ``side_effect`` is an exception, the coroutine will raise the
       exception,
-    - if`` side_effect`` is an iterable, the coroutine will return the next
+    - if ``side_effect`` is an iterable, the coroutine will return the next
       value of the iterable, however, if the sequence of result is exhausted,
-      ``StopIteration`` is raised immediatly,
+      ``StopIteration`` is raised immediately,
     - if ``side_effect`` is not defined, the coroutine will return the value
       defined by ``return_value``, hence, by default, the coroutine returns
       a new :class:`~asynctest.CoroutineMock` object.
 
-    If the outcome of ``side_effect`` or ``return_vaule`` is a coroutine, the
+    If the outcome of ``side_effect`` or ``return_value`` is a coroutine, the
     mock coroutine obtained when the mock object is called will be this
     coroutine itself (and not a coroutine returning a coroutine).
 
@@ -541,12 +541,12 @@ class _patch(unittest.mock._patch):
 def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
           autospec=None, new_callable=None, scope=GLOBAL, **kwargs):
     """
-    A context manager, function decorator or class decorator which patch the
+    A context manager, function decorator or class decorator which patches the
     target with the value given by ther new argument.
 
-    If new isn't provided, the default is a :class:`~asynctest.CoroutineMock`
-    if the patched object is a coroutine, or a :class:`~asynctest.MagicMock`
-    object.
+    If ``new`` isn't provided, the default is a
+    :class:`~asynctest.CoroutineMock` if the patched object is a coroutine, or
+    a :class:`~asynctest.MagicMock` object.
 
     It is a replacement to :func:`unittest.mock.patch`, but using
     :mod:`asynctest.mock` objects.
