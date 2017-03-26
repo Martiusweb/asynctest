@@ -301,6 +301,9 @@ class CoroutineMock(Mock):
         # object is a coroutine
         self._is_coroutine = _is_coroutine
 
+    def _get_child_mock(self, **kwargs):
+        return MagicMock(**kwargs)
+
     def _mock_call(_mock_self, *args, **kwargs):
         try:
             result = super()._mock_call(*args, **kwargs)

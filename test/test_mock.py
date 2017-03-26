@@ -271,6 +271,10 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine):
         mock = asynctest.mock.CoroutineMock()
         self.assertTrue(asyncio.iscoroutinefunction(mock))
 
+    def test_called_CoroutineMock_returns_MagicMock(self):
+        mock = asynctest.mock.CoroutineMock()
+        self.assertIsInstance(run_coroutine(mock()), asynctest.mock.MagicMock)
+
 
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
