@@ -8,19 +8,12 @@ import sys
 
 import asynctest
 
+from .utils import run_coroutine
+
 if sys.version_info >= (3, 5):
     from . import test_mock_await as _using_await
 else:
     _using_await = None
-
-
-def run_coroutine(coroutine):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(coroutine)
-    finally:
-        loop.close()
 
 
 class Test:
@@ -236,6 +229,15 @@ class _Test_Future:
             loop.close()
 
 
+# Import mixins based on the support of async/await keywords
+if _using_await:
+    _Test_Mock_Of_Async_Magic_Methods = inject_class(
+        _using_await._Test_Mock_Of_Async_Magic_Methods)
+else:
+    class _Test_Mock_Of_Async_Magic_Methods:
+        pass
+
+
 class Test_NonCallabableMock(unittest.TestCase, _Test_subclass,
                              _Test_iscoroutinefunction,
                              _Test_is_coroutine_property,
@@ -248,7 +250,8 @@ class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
                                 _Test_iscoroutinefunction,
                                 _Test_is_coroutine_property,
                                 _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
-                                _Test_Future):
+                                _Test_Future,
+                                _Test_Mock_Of_Async_Magic_Methods):
     class_to_test = 'NonCallableMagicMock'
 
 
@@ -260,7 +263,7 @@ class Test_Mock(unittest.TestCase, _Test_subclass,
 
 class Test_MagicMock(unittest.TestCase, _Test_subclass,
                      _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
-                     _Test_Future):
+                     _Test_Future, _Test_Mock_Of_Async_Magic_Methods):
     class_to_test = 'MagicMock'
 
 
