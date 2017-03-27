@@ -74,3 +74,42 @@ class _Test_Mock_Of_Async_Magic_Methods:
         self.assertTrue(mock_instance.__aexit__.called)
         self.assertIsNot(mock_instance, result)
         self.assertIsInstance(result, asynctest.mock.MagicMock)
+
+    def test_mock_customize_async_context_manager(self, klass):
+        instance = self.WithAsyncContextManager()
+        mock_instance = asynctest.mock.MagicMock(instance)
+
+        expected_result = object()
+        mock_instance.__aenter__.return_value = expected_result
+
+        async def use_context_manager():
+            async with mock_instance as result:
+                return result
+
+        self.assertIs(run_coroutine(use_context_manager()), expected_result)
+
+    def test_mock_customize_async_context_manager_with_coroutine(self, klass):
+        enter_called = False
+        exit_called = False
+
+        async def enter_coroutine(*args):
+            nonlocal enter_called
+            enter_called = True
+
+        async def exit_coroutine(*args):
+            nonlocal exit_called
+            exit_called = True
+
+        instance = self.WithAsyncContextManager()
+        mock_instance = asynctest.mock.MagicMock(instance)
+
+        mock_instance.__aenter__ = enter_coroutine
+        mock_instance.__aexit__ = exit_coroutine
+
+        async def use_context_manager():
+            async with mock_instance:
+                pass
+
+        run_coroutine(use_context_manager())
+        self.assertTrue(enter_called)
+        self.assertTrue(exit_called)

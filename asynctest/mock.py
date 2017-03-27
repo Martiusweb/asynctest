@@ -169,6 +169,8 @@ class AsyncMagicMixin:
         behavior but should be compatible with future additions of
         :class:`MagicMock`.
     """
+    # Magic methods are invoked as type(obj).__magic__(obj), as seen in
+    # PEP-343 (with) and PEP-492 (async with)
     def __init__(self, *args, **kwargs):
         self._mock_set_async_magics()  # make magic work for kwargs in init
         unittest.mock._safe_super(AsyncMagicMixin, self).__init__(*args, **kwargs)
@@ -198,6 +200,26 @@ class AsyncMagicMixin:
     def mock_add_spec(self, *args, **kwargs):
         unittest.mock.MagicMock.mock_add_spec(self, *args, **kwargs)
         self._mock_set_async_magics()
+
+    def __setattr__(self, name, value):
+        _mock_methods = getattr(self, '_mock_methods', None)
+        if _mock_methods is None or name in _mock_methods:
+            if name in _async_magics:
+                if not unittest.mock._is_instance_mock(value):
+                    setattr(type(self), name,
+                            unittest.mock._get_method(name, value))
+                    original = value
+
+                    def value(*args, **kwargs):
+                        return original(self, *args, **kwargs)
+                else:
+                    unittest.mock._check_and_set_parent(self, value, None, name)
+                    setattr(type(self), name, value)
+                    self._mock_children[name] = value
+
+                return object.__setattr__(self, name, value)
+
+        unittest.mock._safe_super(AsyncMagicMixin, self).__setattr__(name, value)
 
 
 # Notes about unittest.mock:
