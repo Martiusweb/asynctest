@@ -585,12 +585,14 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
         controls when the patch is activated on generators and coroutines
 
     When used as a decorator with a generator based coroutine, the order of
-    the decorators matters. The ``@asyncio.coroutine`` decorator should be the
-    last since ``@patch()`` conceptually patches the coroutine, not the
-    function.
+    the decorators matters. The order of the ``@patch()`` decorators is in
+    the reverse order of the parameters produced by these patches for the
+    patched function. And the ``@asyncio.coroutine`` decorator should be
+    the last since ``@patch()`` conceptually patches the coroutine, not
+    the function.
 
-        @patch("module.function1")
         @patch("module.function2")
+        @patch("module.function1")
         @asyncio.coroutine
         def test_coro(self, mock_function1, mock_function2):
             yield from asyncio.get_event_loop().sleep(1)
