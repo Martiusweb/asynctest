@@ -1,4 +1,8 @@
 # coding: utf-8
+import asyncio
+import sys
+import warnings
+
 from .utils import run_coroutine
 
 import asynctest.mock
@@ -113,3 +117,78 @@ class _Test_Mock_Of_Async_Magic_Methods:
         run_coroutine(use_context_manager())
         self.assertTrue(enter_called)
         self.assertTrue(exit_called)
+
+    class WithAsyncIterator:
+        def __init__(self):
+            self.iter_called = False
+            self.next_called = False
+            self.items = ["foo", "bar", "baz"]
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            try:
+                return self.items.pop()
+            except IndexError:
+                pass
+
+            raise StopAsyncIteration
+
+    class WithAsyncIteratorDeprecated(WithAsyncIterator):
+        # Before python 3.5.2, __aiter__ is specified as a coroutine, but it's
+        # a design error, it should be a plain function.
+        async def __aiter__(self):
+            return super().__aiter__()
+
+    def get_async_iterator_classes(self):
+        # We assume that __aiter__ as a coroutine will not be available in
+        # python 3.7, see: pep-0525#aiter-and-anext-builtins
+        if sys.version_info >= (3, 7):
+            return (self.WithAsyncIterator, )
+        else:
+            return (self.WithAsyncIterator, self.WithAsyncIteratorDeprecated, )
+
+    def test_mock_aiter_and_anext(self, klass):
+        classes = self.get_async_iterator_classes()
+
+        for iterator_class in classes:
+            with self.subTest(iterator_class=iterator_class.__name__):
+                instance = iterator_class()
+                mock_instance = asynctest.MagicMock(instance)
+
+                self.assertEqual(asyncio.iscoroutine(instance.__aiter__),
+                                 asyncio.iscoroutine(mock_instance.__aiter__))
+                self.assertEqual(asyncio.iscoroutine(instance.__anext__),
+                                 asyncio.iscoroutine(mock_instance.__anext__))
+
+                iterator = mock_instance.__aiter__()
+                if asyncio.iscoroutine(iterator):
+                    iterator = run_coroutine(iterator)
+
+                self.assertIsInstance(iterator, asynctest.MagicMock)
+                # by default, __anext__ will not be a CoroutineMock.
+
+    def test_mock_async_for(self, klass):
+        async def iterate(iterator):
+            accumulator = []
+            # don't print the DeprecationWarning for __aiter__
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+
+                async for item in iterator:
+                    accumulator.append(item)
+
+            return accumulator
+
+        expected = ["FOO", "BAR", "BAZ"]
+        classes = self.get_async_iterator_classes()
+        for iterator_class in classes:
+            instance = iterator_class()
+            mock_instance = asynctest.MagicMock(instance)
+
+            mock_instance.__aiter__.return_value = mock_instance
+            side_effect = expected[:] + [StopAsyncIteration]
+            mock_instance.__anext__.side_effect = side_effect
+
+            self.assertEqual(expected, run_coroutine(iterate(mock_instance)))

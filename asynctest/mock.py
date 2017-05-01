@@ -22,7 +22,7 @@ import unittest.mock
 
 if sys.version_info >= (3, 5):
     from . import _awaitable
-    _async_magics = ("aenter", "aexit", )
+    _async_magics = ("aenter", "aexit", "aiter", "anext")
 else:
     _awaitable = None
     _async_magics = ()
