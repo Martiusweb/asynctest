@@ -321,6 +321,12 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     If you want to mock a coroutine function, use :class:`CoroutineMock`
     instead.
 
+    :class:`MagicMock` allows to mock ``__aenter__``, ``__aexit__``,
+    ``__aiter__`` and ``__anext__``.
+
+    You can not mock ``__await__``. If you want to mock an object implementing
+    __await__, :class:`CoroutineMock` will likely be sufficient.
+
     see :class:`~asynctest.Mock`.
     """
 
