@@ -339,6 +339,50 @@ class TestCase(unittest.case.TestCase):
 
         return super().addCleanup(function, *args, **kwargs)
 
+    @asyncio.coroutine
+    def assertAsyncRaises(self, exception, awaitable):
+        """
+        Test that an exception of type ``exception`` is raised when an
+        exception is raised when awaiting ``awaitable``, a future or coroutine.
+
+        :see: :meth:`unittest.TestCase.assertRaises()`
+        """
+        with self.assertRaises(exception):
+            return (yield from awaitable)
+
+    @asyncio.coroutine
+    def assertAsyncRaisesRegex(self, exception, regex, awaitable):
+        """
+        Like :meth:`assertAsyncRaises()` but also tests that ``regex`` matches
+        on the string representation of the raised exception.
+
+        :see: :meth:`unittest.TestCase.assertRaisesRegex()`
+        """
+        with self.assertRaisesRegex(exception, regex):
+            return (yield from awaitable)
+
+    @asyncio.coroutine
+    def assertAsyncWarns(self, warning, awaitable):
+        """
+        Test that a warning is triggered when awaiting ``awaitable``, a future
+        or a coroutine.
+
+        :see: :meth:`unittest.TestCase.assertWarns()`
+        """
+        with self.assertWarns(warning):
+            return (yield from awaitable)
+
+    @asyncio.coroutine
+    def assertAsyncWarnsRegex(self, warning, regex, awaitable):
+        """
+        Like :meth:`assertAsyncWarns()` but also tests that ``regex`` matches
+        on the message of the triggered warning.
+
+        :see: :meth:`unittest.TestCase.assertWarnsRegex()`
+        """
+        with self.assertWarnsRegex(warning, regex):
+            return (yield from awaitable)
+
 
 class FunctionTestCase(TestCase, unittest.FunctionTestCase):
     """
