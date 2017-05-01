@@ -817,5 +817,85 @@ class Test_fail_on_unused_loop(_TestCase):
                 self.assertEqual(1, len(result.failures))
 
 
+class Test_assertAsyncRaises(asynctest.TestCase):
+    class CustomException(Exception):
+        def __str__(self):
+            return "CustomException Message"
+
+    @property
+    def raising(self):
+        awaitable = asyncio.Future()
+        awaitable.set_exception(self.CustomException())
+        return awaitable
+
+    @property
+    def finishing(self):
+        awaitable = asyncio.Future()
+        awaitable.set_result(None)
+        return awaitable
+
+    @asyncio.coroutine
+    def test_assertAsyncRaises(self):
+        with self.subTest("exception raised"):
+            yield from self.assertAsyncRaises(self.CustomException,
+                                              self.raising)
+
+        with self.subTest("no exception raised"):
+            with self.assertRaises(AssertionError):
+                yield from self.assertAsyncRaises(self.CustomException,
+                                                  self.finishing)
+
+    @asyncio.coroutine
+    def test_assertAsyncRaisesRegex(self):
+        regex = "CustomException"
+        with self.subTest("exception raised"):
+            yield from self.assertAsyncRaisesRegex(self.CustomException,
+                                                   regex, self.raising)
+
+        with self.subTest("no exception raised"):
+            with self.assertRaises(AssertionError):
+                yield from self.assertAsyncRaisesRegex(self.CustomException,
+                                                       regex, self.finishing)
+
+
+class Test_assertAsyncWarns(asynctest.TestCase):
+    class CustomWarning(Warning):
+        pass
+
+    @classmethod
+    @asyncio.coroutine
+    def warns(cls):
+        import warnings
+        warnings.warn("asynctest warning message", cls.CustomWarning)
+
+    @staticmethod
+    def doesnt_warn():
+        awaitable = asyncio.Future()
+        awaitable.set_result(None)
+        return awaitable
+
+    @asyncio.coroutine
+    def test_assertAsyncWarns(self):
+        with self.subTest("warning triggered"):
+            yield from self.assertAsyncWarns(self.CustomWarning, self.warns())
+
+        with self.subTest("warning not triggered"):
+            with self.assertRaises(AssertionError):
+                yield from self.assertAsyncWarns(self.CustomWarning,
+                                                 self.doesnt_warn())
+
+    @asyncio.coroutine
+    def test_assertAsyncWarnsRegex(self):
+        regex = "asynctest warning"
+        with self.subTest("warning triggered"):
+            yield from self.assertAsyncWarnsRegex(self.CustomWarning, regex,
+                                                  self.warns())
+
+        with self.subTest("warning not triggered"):
+            with self.assertRaises(AssertionError):
+                yield from self.assertAsyncWarnsRegex(
+                    self.CustomWarning, regex, self.doesnt_warn())
+
+
 if __name__ == "__main__":
     unittest.main()
