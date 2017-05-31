@@ -95,6 +95,12 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
             # to the new watcher. That's the best we can do so far
             self.original_policy.set_child_watcher(None)
 
+    def get_child_watcher(self):
+        return self.original_policy.get_child_watcher()
+
+    def set_child_watcher(self, watcher):
+        return self.original_policy.set_child_watcher(watcher)
+
 
 class TestCase(unittest.case.TestCase):
     """
