@@ -67,11 +67,16 @@ def async_timeout(func=None, seconds=DEFAULT_TIMEOUT):
             coro_func(self, *args, **kwargs)
         )  # type: asyncio.Task
 
+        cancelled = False
+
         def on_timeout(task: asyncio.Task, loop: asyncio.AbstractEventLoop):
+            nonlocal cancelled
+
             if task.done():
                 return
 
             task.cancel()
+            cancelled = True
 
             @asyncio.coroutine
             def waiter():
@@ -84,6 +89,8 @@ def async_timeout(func=None, seconds=DEFAULT_TIMEOUT):
         try:
             return (yield from task)
         except asyncio.CancelledError as e:
-            raise TimeoutError from e
+            if cancelled:
+                raise TimeoutError from e
+            raise
 
     return wrap
