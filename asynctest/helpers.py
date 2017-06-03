@@ -51,8 +51,9 @@ def async_timeout(func=None, seconds=DEFAULT_TIMEOUT):
     :param seconds: optional time limit in seconds. Default is 10.
     :type seconds: int
     :raises: TimeoutError if time limit is reached
-    It is illegal to pass anything other than a function as the first
-    parameter. The function is wrapped and returned to the caller.
+
+    .. note:: Default timeout might be set as ``ASYNC_TIMEOUT`` environment variable.
+
     """
     if func is None:
         return partial(async_timeout, seconds=seconds)
