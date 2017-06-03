@@ -36,5 +36,17 @@ class TestExhaust(asynctest.TestCase):
         self.assertTrue(fut2.done())
 
 
+class TestTimeout(asynctest.TestCase):
+    @asyncio.coroutine
+    def test_timeout(self):
+
+        @asynctest.async_timeout(seconds=1)
+        def test_func(*_):
+            yield from asyncio.sleep(999, loop=self.loop)
+
+        with self.assertRaises(TimeoutError):
+            yield from test_func(self)
+
+
 if __name__ == "__main__":
     unittest.main()
