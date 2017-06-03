@@ -40,11 +40,11 @@ def async_timeout(func=None, seconds=DEFAULT_TIMEOUT):
 
         class TimedOutTestCase(TestCase):
             @async_timeout
-            async def default_timeout_test(self):
+            async def test_default_timeout(self):
                 await asyncio.sleep(999, loop=self.loop)
 
             @async_timeout(seconds=1)
-            async def custom_timeout_test(self):
+            async def test_custom_timeout(self):
                 await asyncio.sleep(999, loop=self.loop)
 
     :param func: Coroutine function
