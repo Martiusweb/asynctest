@@ -3,7 +3,7 @@ language: python
 python:
 - 3.4
 - 3.5
-- 3.6
+- &python_major_ver 3.6
 - nightly
 script:
 - python -m unittest test
@@ -12,3 +12,26 @@ env:
   matrix:
   - ""
   - PYTHONASYNCIODEBUG=1
+
+jobs:
+  fast_finish: true
+
+  include:
+  - stage: &deploy_stage_name deploy to PYPI
+    python: *python_major_ver
+    script: skip
+    deploy: &deploy_step
+      provider: pypi
+      distribution: sdist bdist_wheel
+      user: martius
+      password:
+        secure: CkgSH/6923CeZK+4ZW9Flm/az4ne7ODxhdEPWfk/NCU6pBAQNw1mCCE71kCKk8jPZ+R/1yHXR1uoXSblDmE4vNMJoHVg3NxEFZ7HZC82ZRmqSDxIMzUw+mVyvvNE6qrKXtSAOF7un8YpMrKCN60/zdOap4lcmTkrq/5R/tVH7bQ=
+      on: # Only when a tag is on master and matches vX.Y.Z
+        tags: true
+        branch: master
+        condition: '$TRAVIS_TAG =~ ^v([0-9]+\.){2}[0-9]+$'
+
+stages:
+- test
+- name: *deploy_stage_name
+  if: tag IS present
