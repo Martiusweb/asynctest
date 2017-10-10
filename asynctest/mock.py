@@ -104,20 +104,21 @@ def _mock_add_spec(self, spec, *args, **kwargs):
     self.__dict__['_spec_coroutines'] = _spec_coroutines
 
 
-def _get_child_mock(self, *args, _new_name=None, **kwargs):
-        if _new_name in self.__dict__['_spec_coroutines']:
-            return CoroutineMock(*args, **kwargs)
+def _get_child_mock(self, *args, **kwargs):
+    _new_name = kwargs.get("_new_name")
+    if _new_name in self.__dict__['_spec_coroutines']:
+        return CoroutineMock(*args, **kwargs)
 
-        _type = type(self)
-        if not issubclass(_type, unittest.mock.CallableMixin):
-            if issubclass(_type, unittest.mock.NonCallableMagicMock):
-                klass = MagicMock
-            elif issubclass(_type, NonCallableMock):
-                klass = Mock
-        else:
-            klass = _type.__mro__[1]
+    _type = type(self)
+    if not issubclass(_type, unittest.mock.CallableMixin):
+        if issubclass(_type, unittest.mock.NonCallableMagicMock):
+            klass = MagicMock
+        elif issubclass(_type, NonCallableMock):
+            klass = Mock
+    else:
+        klass = _type.__mro__[1]
 
-        return klass(**kwargs)
+    return klass(*args, **kwargs)
 
 
 class MockMetaMixin(FakeInheritanceMeta):

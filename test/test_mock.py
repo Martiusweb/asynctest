@@ -199,6 +199,21 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
                 if _using_await:
                     self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineMock)
 
+    # Ensure the name of the mock is correctly set, tests bug #49.
+    def test_mock_has_correct_name(self, klass):
+        spec = Test()
+
+        for attr in ('spec', 'spec_set', ):
+            with self.subTest(spec_type=attr):
+                mock = klass(**{attr: spec})
+
+                self.assertIn("{}='{}".format(attr, "Test"), repr(mock))
+                self.assertIn("name='mock.a_coroutine'", repr(mock.a_coroutine))
+                mock.a_coroutine()  # is a generator, not a Mock with a repr
+                self.assertIn("name='mock.a_function()'", repr(mock.a_function()))
+                self.assertEqual("call.a_coroutine()", repr(mock.mock_calls[0]))
+                self.assertEqual("call.a_function()", repr(mock.mock_calls[1]))
+
 
 @inject_class
 class _Test_Future:
