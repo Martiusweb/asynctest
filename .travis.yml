@@ -22,7 +22,7 @@ jobs:
     script: skip
     deploy: &deploy_step
       provider: pypi
-      distribution: sdist bdist_wheel
+      distributions: "sdist bdist_wheel"
       user: martius
       password:
         secure: CkgSH/6923CeZK+4ZW9Flm/az4ne7ODxhdEPWfk/NCU6pBAQNw1mCCE71kCKk8jPZ+R/1yHXR1uoXSblDmE4vNMJoHVg3NxEFZ7HZC82ZRmqSDxIMzUw+mVyvvNE6qrKXtSAOF7un8YpMrKCN60/zdOap4lcmTkrq/5R/tVH7bQ=
