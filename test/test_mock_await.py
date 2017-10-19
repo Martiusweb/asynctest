@@ -118,6 +118,19 @@ class _Test_Mock_Of_Async_Magic_Methods:
         self.assertTrue(enter_called)
         self.assertTrue(exit_called)
 
+    def test_context_manager_raise_exception_by_default(self, klass):
+        class InContextManagerException(Exception):
+            pass
+
+        async def raise_in(context_manager):
+            async with context_manager:
+                raise InContextManagerException()
+
+        instance = self.WithAsyncContextManager()
+        mock_instance = asynctest.mock.MagicMock(instance)
+        with self.assertRaises(InContextManagerException):
+            run_coroutine(raise_in(mock_instance))
+
     class WithAsyncIterator:
         def __init__(self):
             self.iter_called = False

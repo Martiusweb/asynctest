@@ -23,6 +23,12 @@ import unittest.mock
 if sys.version_info >= (3, 5):
     from . import _awaitable
     _async_magics = ("aenter", "aexit", "aiter", "anext")
+
+    # We use unittest.mock.MagicProxy which works well, but it's not aware that
+    # we want __aexit__ to return a falsy value by default.
+    # We add the entry in unittest internal dict as it will not change the
+    # normal behavior of unittest.
+    unittest.mock._return_values["__aexit__"] = False
 else:
     _awaitable = None
     _async_magics = ()
