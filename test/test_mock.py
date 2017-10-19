@@ -188,9 +188,13 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
                 self.assertIsInstance(mock.a_function, (asynctest.Mock, asynctest.MagicMock))
                 self.assertNotIsInstance(mock.a_function, asynctest.CoroutineMock)
                 self.assertIsInstance(mock.a_coroutine, asynctest.CoroutineMock)
+                mock.a_coroutine.return_value = "PROBE"
+                self.assertEqual("PROBE", run_coroutine(mock.a_coroutine()))
 
                 if _using_await:
                     self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineMock)
+                    mock.an_async_coroutine.return_value = "PROBE"
+                    self.assertEqual("PROBE", run_coroutine(mock.an_async_coroutine()))
 
     # Ensure the name of the mock is correctly set, tests bug #49.
     def test_mock_has_correct_name(self, klass):
