@@ -175,12 +175,18 @@ class _Test_Mock_Of_Async_Magic_Methods:
                 self.assertEqual(asyncio.iscoroutine(instance.__anext__),
                                  asyncio.iscoroutine(mock_instance.__anext__))
 
-                iterator = mock_instance.__aiter__()
+                iterator = instance.__aiter__()
                 if asyncio.iscoroutine(iterator):
                     iterator = run_coroutine(iterator)
 
-                self.assertIsInstance(iterator, asynctest.MagicMock)
-                # by default, __anext__ will not be a CoroutineMock.
+                mock_iterator = mock_instance.__aiter__()
+                if asyncio.iscoroutine(mock_iterator):
+                    mock_iterator = run_coroutine(mock_iterator)
+
+                self.assertEqual(asyncio.iscoroutine(iterator.__aiter__),
+                                 asyncio.iscoroutine(mock_iterator.__aiter__))
+                self.assertEqual(asyncio.iscoroutine(iterator.__anext__),
+                                 asyncio.iscoroutine(mock_iterator.__anext__))
 
     def test_mock_async_for(self, klass):
         async def iterate(iterator):
@@ -198,10 +204,19 @@ class _Test_Mock_Of_Async_Magic_Methods:
         classes = self.get_async_iterator_classes()
         for iterator_class in classes:
             instance = iterator_class()
-            mock_instance = asynctest.MagicMock(instance)
 
-            mock_instance.__aiter__.return_value = mock_instance
-            side_effect = expected[:] + [StopAsyncIteration]
-            mock_instance.__anext__.side_effect = side_effect
+            with self.subTest("iterate through default value"):
+                mock_instance = asynctest.MagicMock(instance)
+                self.assertEqual([], run_coroutine(iterate(mock_instance)))
 
-            self.assertEqual(expected, run_coroutine(iterate(mock_instance)))
+            with self.subTest("iterate through set return_value"):
+                mock_instance = asynctest.MagicMock(instance)
+                mock_instance.__aiter__.return_value = expected[:]
+
+                self.assertEqual(expected, run_coroutine(iterate(mock_instance)))
+
+            with self.subTest("iterate through set return_value iterator"):
+                mock_instance = asynctest.MagicMock(instance)
+                mock_instance.__aiter__.return_value = iter(expected[:])
+
+                self.assertEqual(expected, run_coroutine(iterate(mock_instance)))

@@ -20,6 +20,7 @@ import sys
 import types
 import unittest.mock
 
+
 if sys.version_info >= (3, 5):
     from . import _awaitable
     _async_magics = ("aenter", "aexit", "aiter", "anext")
@@ -29,6 +30,24 @@ if sys.version_info >= (3, 5):
     # We add the entry in unittest internal dict as it will not change the
     # normal behavior of unittest.
     unittest.mock._return_values["__aexit__"] = False
+
+    def _get_async_iter(mock):
+        def __aiter__():
+            return_value = mock.__aiter__._mock_return_value
+            if return_value is DEFAULT:
+                iterator = iter([])
+            else:
+                iterator = iter(return_value)
+
+            return _awaitable.AsyncIterator(iterator)
+
+        if asyncio.iscoroutinefunction(mock.__aiter__):
+            return asyncio.coroutine(__aiter__)
+
+        return __aiter__
+
+
+    unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
 else:
     _awaitable = None
     _async_magics = ()
@@ -329,6 +348,10 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
 
     :class:`MagicMock` allows to mock ``__aenter__``, ``__aexit__``,
     ``__aiter__`` and ``__anext__``.
+
+    When mocking an ansynchronous iterator, you can set the
+    ``return_value`` of ``__aiter__`` to an iterable to define the list of
+    values to be returned during iteration.
 
     You can not mock ``__await__``. If you want to mock an object implementing
     __await__, :class:`CoroutineMock` will likely be sufficient.
