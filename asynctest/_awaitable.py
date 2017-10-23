@@ -21,3 +21,21 @@ def make_native_coroutine(coroutine):
         return await coroutine(*args, **kwargs)
 
     return wrapper
+
+
+class AsyncIterator:
+    """
+    Wraps an iterator in an asynchronous iterator.
+    """
+    def __init__(self, iterator):
+        self.iterator = iterator
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.iterator)
+        except StopIteration:
+            pass
+        raise StopAsyncIteration

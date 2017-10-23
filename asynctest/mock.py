@@ -20,10 +20,39 @@ import sys
 import types
 import unittest.mock
 
+
 if sys.version_info >= (3, 5):
     from . import _awaitable
+    _async_magics = ("aenter", "aexit", "aiter", "anext")
+
+    # We use unittest.mock.MagicProxy which works well, but it's not aware that
+    # we want __aexit__ to return a falsy value by default.
+    # We add the entry in unittest internal dict as it will not change the
+    # normal behavior of unittest.
+    unittest.mock._return_values["__aexit__"] = False
+
+    def _get_async_iter(mock):
+        def __aiter__():
+            return_value = mock.__aiter__._mock_return_value
+            if return_value is DEFAULT:
+                iterator = iter([])
+            else:
+                iterator = iter(return_value)
+
+            return _awaitable.AsyncIterator(iterator)
+
+        if asyncio.iscoroutinefunction(mock.__aiter__):
+            return asyncio.coroutine(__aiter__)
+
+        return __aiter__
+
+
+    unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
 else:
     _awaitable = None
+    _async_magics = ()
+
+_async_magics = set(map("__{}__".format, _async_magics))
 
 
 # From python 3.6, a sentinel object is used to mark coroutines (rather than
@@ -154,6 +183,70 @@ class IsCoroutineArgMeta(MockMetaMixin):
         return super().__new__(meta, name, base, namespace)
 
 
+class AsyncMagicMixin:
+    """
+    Add support for async magic methods to :class:`MagicMock` and
+    :class:`NonCallableMagicMock`.
+
+    Actually, it's a shameless copy-paste of :class:`unittest.mock.MagicMixin`:
+        when added to our classes, it will just do exactly what its
+        :mod:`unittest` counterpart does, but for magic methods. It adds some
+        behavior but should be compatible with future additions of
+        :class:`MagicMock`.
+    """
+    # Magic methods are invoked as type(obj).__magic__(obj), as seen in
+    # PEP-343 (with) and PEP-492 (async with)
+    def __init__(self, *args, **kwargs):
+        self._mock_set_async_magics()  # make magic work for kwargs in init
+        unittest.mock._safe_super(AsyncMagicMixin, self).__init__(*args, **kwargs)
+        self._mock_set_async_magics()  # fix magic broken by upper level init
+
+    def _mock_set_async_magics(self):
+        these_magics = _async_magics
+
+        if getattr(self, "_mock_methods", None) is not None:
+            these_magics = _async_magics.intersection(self._mock_methods)
+
+            remove_magics = set()
+            remove_magics = _async_magics - these_magics
+
+            for entry in remove_magics:
+                if entry in type(self).__dict__:
+                    # remove unneeded magic methods
+                    delattr(self, entry)
+
+        # don't overwrite existing attributes if called a second time
+        these_magics = these_magics - set(type(self).__dict__)
+
+        _type = type(self)
+        for entry in these_magics:
+            setattr(_type, entry, unittest.mock.MagicProxy(entry, self))
+
+    def mock_add_spec(self, *args, **kwargs):
+        unittest.mock.MagicMock.mock_add_spec(self, *args, **kwargs)
+        self._mock_set_async_magics()
+
+    def __setattr__(self, name, value):
+        _mock_methods = getattr(self, '_mock_methods', None)
+        if _mock_methods is None or name in _mock_methods:
+            if name in _async_magics:
+                if not unittest.mock._is_instance_mock(value):
+                    setattr(type(self), name,
+                            unittest.mock._get_method(name, value))
+                    original = value
+
+                    def value(*args, **kwargs):
+                        return original(self, *args, **kwargs)
+                else:
+                    unittest.mock._check_and_set_parent(self, value, None, name)
+                    setattr(type(self), name, value)
+                    self._mock_children[name] = value
+
+                return object.__setattr__(self, name, value)
+
+        unittest.mock._safe_super(AsyncMagicMixin, self).__setattr__(name, value)
+
+
 # Notes about unittest.mock:
 #  - MagicMock > Mock > NonCallableMock (where ">" means inherits from)
 #  - when a mock instance is created, a new class (type) is created
@@ -191,7 +284,7 @@ class NonCallableMock(unittest.mock.NonCallableMock,
         self._asynctest_set_is_coroutine(is_coroutine)
 
 
-class NonCallableMagicMock(unittest.mock.NonCallableMagicMock,
+class NonCallableMagicMock(AsyncMagicMixin, unittest.mock.NonCallableMagicMock,
                            metaclass=IsCoroutineArgMeta):
     """
     A version of :class:`~asynctest.MagicMock` that isn't callable.
@@ -242,7 +335,8 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     """
 
 
-class MagicMock(unittest.mock.MagicMock, metaclass=MockMetaMixin):
+class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
+                metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.MagicMock` so it returns
     a :class:`~asynctest.CoroutineMock` object instead of
@@ -251,6 +345,16 @@ class MagicMock(unittest.mock.MagicMock, metaclass=MockMetaMixin):
 
     If you want to mock a coroutine function, use :class:`CoroutineMock`
     instead.
+
+    :class:`MagicMock` allows to mock ``__aenter__``, ``__aexit__``,
+    ``__aiter__`` and ``__anext__``.
+
+    When mocking an ansynchronous iterator, you can set the
+    ``return_value`` of ``__aiter__`` to an iterable to define the list of
+    values to be returned during iteration.
+
+    You can not mock ``__await__``. If you want to mock an object implementing
+    __await__, :class:`CoroutineMock` will likely be sufficient.
 
     see :class:`~asynctest.Mock`.
     """
@@ -300,6 +404,9 @@ class CoroutineMock(Mock):
         # asyncio.iscoroutinefunction() checks this property to say if an
         # object is a coroutine
         self._is_coroutine = _is_coroutine
+
+    def _get_child_mock(self, **kwargs):
+        return MagicMock(**kwargs)
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
