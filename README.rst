@@ -45,12 +45,14 @@ TestCases
   - ClockedTestCase allows to control the loop clock and run timed events
     without waiting the wall clock.
 
-
 Mock and CoroutineMock
 ~~~~~~~~~~~~~~~~~~~~~~
 
   - CoroutineMock is a new Mock class which mocks a coroutine function, and
     returns a coroutine when called,
+
+  - MagicMock supports asynchronous context managers and asynchronous
+    iterators,
 
   - NonCallableMock, Mock and CoroutineMock can return CoroutineMock objects
     when its attributes are get if there is a matching attribute in the spec
@@ -68,7 +70,6 @@ Mock and CoroutineMock
 
   - return_once() can be used with Mock.side_effect to return a value only
     once when a mock is called.
-
 
 Selectors
 ~~~~~~~~~
@@ -102,7 +103,6 @@ Roadmap
 
 I hope I will find time to develop and release the following features:
 
-- mocking of asynchronous iterators and context managers
 - set of warnings against common mistakes
 - proactor support
 
