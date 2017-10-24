@@ -21,6 +21,25 @@ Enhance :class:`unittest.TestCase`:
   coroutine functions,
 
 * a test fails if the loop did not run during the test.
+
+class-level set-up
+------------------
+
+Since each test runs in its own loop, it is not possible to run
+:meth:`~TestCase.setUpClass()` and :meth:`~TestCase.tearDownClass()` as
+coroutines.
+
+If one needs to perform set-up actions at the class level (meaning
+once for all tests in the class), it should be done using a loop created for
+this sole purpose and that is not shared with the tests. Ideally, the loop
+shall be closed in the method which creates it.
+
+If one really needs to share a loop between tests,
+:attr:`TestCase.use_default_loop` can be set to ``True`` (as a class
+attribute). The test case will use the loop returned by
+:meth:`asyncio.get_event_loop()` instead of creating a new loop for each test.
+This way, the event loop or event loop policy can be set during class-level
+set-up and tear down.
 """
 
 import asyncio
