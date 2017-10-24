@@ -215,7 +215,6 @@ class TestCase(unittest.case.TestCase):
 
     def _setUp(self):
         self._init_loop()
-        self.addCleanup(self._unset_loop)
 
         # initialize post-test checks
         test = getattr(self, self._testMethodName)
@@ -278,7 +277,8 @@ class TestCase(unittest.case.TestCase):
                 with outcome.testPartExecutor(self):
                     self._tearDown()
 
-            self.doCleanups()
+            self.loop.run_until_complete(self.doCleanups())
+            self._unset_loop()
             for test, reason in outcome.skipped:
                 self._addSkip(result, test, reason)
             self._feedErrorsToResult(result, outcome.errors)
@@ -312,13 +312,17 @@ class TestCase(unittest.case.TestCase):
         try:
             self._run_test_method(getattr(self, self._testMethodName))
             self._tearDown()
-        except Exception:
-            self._unset_loop()
-            raise
 
-        while self._cleanups:
-            function, args, kwargs = self._cleanups.pop(-1)
-            function(*args, **kwargs)
+            while self._cleanups:
+                function, args, kwargs = self._cleanups.pop(-1)
+                if asyncio.iscoroutinefunction(function):
+                    self.loop.run_until_complete(function(*args, **kwargs))
+                else:
+                    function(*args, **kwargs)
+        except Exception:
+            raise
+        finally:
+            self._unset_loop()
 
     def _run_test_method(self, method):
         # If the method is a coroutine or returns a coroutine, run it on the
@@ -327,16 +331,28 @@ class TestCase(unittest.case.TestCase):
         if asyncio.iscoroutine(result):
             self.loop.run_until_complete(result)
 
+    @asyncio.coroutine
+    def doCleanups(self):
+        """
+        Execute all cleanup functions. Normally called for you after tearDown.
+        """
+        outcome = self._outcome or unittest.mock._Outcome()
+        while self._cleanups:
+            function, args, kwargs = self._cleanups.pop()
+            with outcome.testPartExecutor(self):
+                if asyncio.iscoroutinefunction(function):
+                    yield from function(*args, **kwargs)
+                else:
+                    function(*args, **kwargs)
+
+        return outcome.success
+
     def addCleanup(self, function, *args, **kwargs):
         """
         Add a function, with arguments, to be called when the test is
         completed. If function is a coroutine function, it will run on the loop
         before it's cleaned.
         """
-        if asyncio.iscoroutinefunction(function):
-            return super().addCleanup(self.loop.run_until_complete,
-                                      function(*args, **kwargs))
-
         return super().addCleanup(function, *args, **kwargs)
 
     @asyncio.coroutine
