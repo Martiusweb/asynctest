@@ -5,6 +5,8 @@ python:
 - 3.5
 - &python_major_ver 3.6
 - nightly
+install:
+- pip install -U 'setuptools>=36.6.0'
 script:
 - python -m unittest test
 
