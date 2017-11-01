@@ -441,6 +441,116 @@ class CoroutineMock(Mock):
             return asyncio.coroutine(_raise)(e)
 
 
+def create_autospec(spec, spec_set=False, instance=False, _parent=None,
+                    _name=None, **kwargs):
+    """
+    Create a mock object using another object as a spec. Attributes on the mock
+    will use the corresponding attribute on the spec object as their spec.
+
+    ``spec`` can be a coroutine function, a class or object with couroutine
+    functions as attributes.
+
+    If ``spec`` is a coroutine function, and ``instance`` is not ``False``, a
+    :exc:`RuntimeError` is raised.
+
+    versionadded:: 0.12
+    """
+    if unittest.mock._is_list(spec):
+        spec = type(spec)
+
+    is_type = isinstance(spec, type)
+    is_coroutine_func = asyncio.iscoroutinefunction(spec)
+
+    _kwargs = {'spec': spec}
+    if spec_set:
+        _kwargs = {'spec_set': spec}
+    elif spec is None:
+        # None we mock with a normal mock without a spec
+        _kwargs = {}
+    if _kwargs and instance:
+        _kwargs['_spec_as_instance'] = True
+
+    _kwargs.update(kwargs)
+
+    Klass = MagicMock
+    if inspect.isdatadescriptor(spec):
+        _kwargs = {}
+    elif is_coroutine_func:
+        if instance:
+            raise RuntimeError("Instance can not be True when create_autospec "
+                               "is mocking a coroutine function")
+        Klass = CoroutineMock
+    elif not unittest.mock._callable(spec):
+        Klass = NonCallableMagicMock
+    elif is_type and instance and not unittest.mock._instance_callable(spec):
+        Klass = NonCallableMagicMock
+
+    _name = _kwargs.pop('name', _name)
+
+    _new_name = _name
+    if _parent is None:
+        _new_name = ''
+
+    mock = Klass(parent=_parent, _new_parent=_parent, _new_name=_new_name,
+                 name=_name, **_kwargs)
+
+    if isinstance(spec, unittest.mock.FunctionTypes):
+        mock = unittest.mock._set_signature(mock, spec)
+        if is_coroutine_func:
+            # Can't wrap the mock with asyncio.coroutine because it doesn't
+            # detect a CoroWrapper as an awaitable in debug mode.
+            # It is safe to do so because the mock object wrapped by
+            # _set_signature returns the result of the CoroutineMock itself,
+            # which is a Coroutine (as defined in CoroutineMock._mock_call)
+            mock._is_coroutine = _is_coroutine
+    else:
+        unittest.mock._check_signature(spec, mock, is_type, instance)
+
+    if _parent is not None and not instance:
+        _parent._mock_children[_name] = mock
+
+    if is_type and not instance and 'return_value' not in kwargs:
+        mock.return_value = create_autospec(spec, spec_set, instance=True,
+                                            _name='()', _parent=mock)
+
+    for entry in dir(spec):
+        if unittest.mock._is_magic(entry):
+            continue
+        try:
+            original = getattr(spec, entry)
+        except AttributeError:
+            continue
+
+        kwargs = {'spec': original}
+        if spec_set:
+            kwargs = {'spec_set': original}
+
+        if not isinstance(original, unittest.mock.FunctionTypes):
+            new = unittest.mock._SpecState(original, spec_set, mock, entry,
+                                           instance)
+            mock._mock_children[entry] = new
+        else:
+            parent = mock
+            if isinstance(spec, unittest.mock.FunctionTypes):
+                parent = mock.mock
+
+            skipfirst = unittest.mock._must_skip(spec, entry, is_type)
+            kwargs['_eat_self'] = skipfirst
+            if asyncio.iscoroutinefunction(original):
+                child_klass = CoroutineMock
+            else:
+                child_klass = MagicMock
+            new = child_klass(parent=parent, name=entry, _new_name=entry,
+                              _new_parent=parent, **kwargs)
+            mock._mock_children[entry] = new
+            unittest.mock._check_signature(original, new, skipfirst=skipfirst)
+
+        if isinstance(new, unittest.mock.FunctionTypes):
+            setattr(mock, entry, new)
+
+    return mock
+
+
 def mock_open(mock=None, read_data=''):
     """
     A helper function to create a mock to replace the use of :func:`open()`. It
@@ -539,7 +649,7 @@ def _decorate_coroutine_callable(func, new_patching):
             gen = func(*args, **keywargs)
             return _PatchedGenerator(gen, patchings,
                                      asyncio.iscoroutinefunction(func))
-        except:
+        except BaseException:
             if patching not in patchers_to_exit and _is_started(patching):
                 # the patcher may have been started, but an exception
                 # raised whilst entering one of its additional_patchers
@@ -595,7 +705,7 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
                 [stack.enter_context(patching) for patching in self.patchings
                     if patching.scope == LIMITED]
                 return self.gen.send(None)
-        except:
+        except BaseException:
             # the generator/coroutine terminated, stop the patchings
             for patching in reversed(self.patchings):
                 if patching.scope == GLOBAL and _is_started(patching):

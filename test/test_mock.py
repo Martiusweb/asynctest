@@ -1343,5 +1343,129 @@ class Test_return_once(unittest.TestCase):
             self.assertRaises(BlockingIOError, mock)
 
 
+class Test_create_autospec(unittest.TestCase):
+    def test_generator_and_coroutine_is_instance_of_FunctionType(self):
+        # this test is somewhat a forward compatibility test: if ever
+        # unittest.mock.FunctionTypes doesn't detect generators and coroutines
+        # as instance of these types, we need to fix it in asynctest.
+        def gen():
+            yield from range(10)
+
+        @asyncio.coroutine
+        def coroutine():
+            yield from asyncio.sleep(0)
+
+        self.assertIsInstance(gen, unittest.mock.FunctionTypes)
+        self.assertIsInstance(coroutine, unittest.mock.FunctionTypes)
+        if _using_await:
+            self.assertIsInstance(_using_await.transform(coroutine),
+                                  unittest.mock.FunctionTypes)
+
+    # create_autospec:
+    # * Ensure we check the signature of the coroutine function (and/or
+    #   generator)
+    # * Ensure a coroutine function attribute of a mock create with
+    #   create_autospec is a CoroutineMock
+    # * Ensure an instance of a class mocked from create_autospec will be an
+    #   asynctest mock, and its coroutine attribute will be mocked by
+    #   a CoroutineMock
+    # * Ensure all expected create_autospec tests still run fine
+    #
+    # Also test cases where create_autospec is used (_patch, etc)
+    def test_autospec_returns_asynctest_mocks(self):
+        def a_generator():
+            yield from range(10)
+
+        cases = {
+            "non callable": "Constant value",
+            "callable class": Test,
+            "non callable instance": Test(),
+            "callable function": Test.a_function,
+            "callable generator": a_generator,
+        }
+
+        for name, value in cases.items():
+            with self.subTest(name):
+                mock = asynctest.mock.create_autospec(value)
+                unittest_mock = unittest.mock.create_autospec(value)
+                try:
+                    expected_type = getattr(asynctest.mock,
+                                            type(unittest_mock).__name__)
+                except AttributeError:
+                    # The type of returned object is not readable as a mock
+                    # This happens with mocks updated by _set_signature
+                    expected_type = type(unittest_mock)
+                self.assertIsInstance(mock, expected_type)
+                self.assertNotIsInstance(mock, asynctest.mock.CoroutineMock)
+
+    def test_autospec_of_coroutine_function_is_coroutinefunction(self):
+        mock = asynctest.mock.create_autospec(Test.a_function)
+        self.assertFalse(asyncio.iscoroutinefunction(mock))
+
+        mock = asynctest.mock.create_autospec(Test.a_coroutine)
+        self.assertTrue(asyncio.iscoroutinefunction(mock))
+
+        if _using_await:
+            mock = asynctest.mock.create_autospec(Test.an_async_coroutine)
+            self.assertTrue(asyncio.iscoroutinefunction(mock))
+
+    def test_autospec_attributes_being_coroutine_functions(self):
+        mock = asynctest.mock.create_autospec(Test)
+        self.assertFalse(asyncio.iscoroutinefunction(mock))
+        self.assertFalse(asyncio.iscoroutinefunction(mock.a_function))
+        self.assertTrue(asyncio.iscoroutinefunction(mock.a_coroutine))
+        if _using_await:
+            self.assertTrue(asyncio.iscoroutinefunction(mock.an_async_coroutine))
+
+    def test_create_autospec_on_coroutine_with_return_value(self):
+        mock = asynctest.mock.create_autospec(Test.a_coroutine,
+                                              return_value="PROBE")
+        self.assertEqual("PROBE", run_coroutine(mock(None)))
+
+        if _using_await:
+            mock = asynctest.mock.create_autospec(Test.an_async_coroutine,
+                                                  return_value="PROBE")
+            self.assertEqual("PROBE", run_coroutine(mock(None)))
+
+    def test_create_autospec_on_coroutine_with_iterable_side_effect(self):
+        coroutines = [Test.a_coroutine]
+        if _using_await:
+            coroutines.append(Test.an_async_coroutine)
+
+        for a_coroutine in coroutines:
+            mock = asynctest.mock.create_autospec(
+                a_coroutine, side_effect=("PROBE1", "PROBE2"))
+            self.assertEqual("PROBE1", run_coroutine(mock(None)))
+            self.assertEqual("PROBE2", run_coroutine(mock(None)))
+
+    def test_create_autospec_on_coroutine_with_exception_side_effect(self):
+        exception = Exception()
+        coroutines = [Test.a_coroutine]
+        if _using_await:
+            coroutines.append(Test.an_async_coroutine)
+
+        for a_coroutine in coroutines:
+            mock = asynctest.mock.create_autospec(a_coroutine,
+                                                  side_effect=exception)
+            with self.assertRaises(Exception) as ctx:
+                run_coroutine(mock(None))
+
+            self.assertIs(ctx.exception, exception)
+
+    def test_create_autospec_on_coroutine_with_coroutine_side_effect(self):
+        coroutines = [Test.a_coroutine]
+        if _using_await:
+            coroutines.append(Test.an_async_coroutine)
+
+        for a_coroutine in coroutines:
+            mock = asynctest.mock.create_autospec(
+                a_coroutine, side_effect=asyncio.coroutine(lambda r: r))
+            self.assertEqual("PROBE", run_coroutine(mock("PROBE")))
+
+    def test_create_autospec_on_coroutine_with_instance_raises_RuntimeError(self):
+        with self.assertRaises(RuntimeError):
+            asynctest.mock.create_autospec(Test.a_coroutine, instance=True)
+
+
 if __name__ == "__main__":
     unittest.main()
