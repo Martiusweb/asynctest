@@ -364,6 +364,10 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     __await__, :class:`CoroutineMock` will likely be sufficient.
 
     see :class:`~asynctest.Mock`.
+
+    .. versionadded:: 0.11
+
+        support of asynchronous iterators and asynchronous context managers.
     """
 
 
