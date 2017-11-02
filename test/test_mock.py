@@ -213,6 +213,19 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
 
 
 @inject_class
+class _Test_Spec_Spec_Set_Is_Function:
+    def test_mock_is_not_coroutine_when_spec_is_function(self, klass):
+        spec = Test.a_function
+
+        for attr in ('spec', 'spec_set', ):
+            with self.subTest(sepc_type=attr):
+                mock = klass(**{attr: spec})
+                self.assertFalse(asyncio.iscoroutinefunction(mock))
+                if hasattr(inspect, "iscoroutinefunction"):
+                    self.assertFalse(inspect.iscoroutinefunction(mock))
+
+
+@inject_class
 class _Test_Future:
     # Ensure that a mocked Future is detected as a future
     def test_mock_a_future_is_a_future(self, klass):
@@ -246,6 +259,7 @@ class Test_NonCallabableMock(unittest.TestCase, _Test_subclass,
                              _Test_iscoroutinefunction,
                              _Test_is_coroutine_property,
                              _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                             _Test_Spec_Spec_Set_Is_Function,
                              _Test_Future):
     class_to_test = 'NonCallableMock'
 
@@ -254,6 +268,7 @@ class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
                                 _Test_iscoroutinefunction,
                                 _Test_is_coroutine_property,
                                 _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                                _Test_Spec_Spec_Set_Is_Function,
                                 _Test_Future,
                                 _Test_Mock_Of_Async_Magic_Methods):
     class_to_test = 'NonCallableMagicMock'
@@ -261,12 +276,14 @@ class Test_NonCallableMagicMock(unittest.TestCase, _Test_subclass,
 
 class Test_Mock(unittest.TestCase, _Test_subclass,
                 _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                _Test_Spec_Spec_Set_Is_Function,
                 _Test_Future):
     class_to_test = 'Mock'
 
 
 class Test_MagicMock(unittest.TestCase, _Test_subclass,
                      _Test_Spec_Spec_Set_Returns_Coroutine_Mock,
+                     _Test_Spec_Spec_Set_Is_Function,
                      _Test_Future, _Test_Mock_Of_Async_Magic_Methods):
     class_to_test = 'MagicMock'
 

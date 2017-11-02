@@ -56,7 +56,6 @@ else:
     _awaitable = None
     async_magic_coroutines = _async_magics = set()
 
-
 # From python 3.6, a sentinel object is used to mark coroutines (rather than
 # a boolean) to prevent a mock/proxy object to return a truthy value.
 # see: https://github.com/python/asyncio/commit/ea776a11f632a975ad3ebbb07d8981804aa292db
@@ -160,9 +159,15 @@ def _get_child_mock(self, *args, **kwargs):
 class MockMetaMixin(FakeInheritanceMeta):
     def __new__(meta, name, base, namespace):
         if not any((isinstance(baseclass, meta) for baseclass in base)):
+            # this ensures that inspect.iscoroutinefunction() doesn't return
+            # True when testing a mock.
+            code_mock = unittest.mock.NonCallableMock(spec_set=types.CodeType)
+            code_mock.co_flags = 0
+
             namespace.update({
                 '_mock_add_spec': _mock_add_spec,
                 '_get_child_mock': _get_child_mock,
+                '__code__': code_mock,
             })
 
         return super().__new__(meta, name, base, namespace)
