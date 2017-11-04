@@ -51,12 +51,13 @@ class _Test_Mock_Of_Async_Magic_Methods:
             self.exited = True
 
     def test_mock_magic_methods_are_coroutine_mocks(self, klass):
-        instance = self.WithAsyncContextManager()
-        mock_instance = asynctest.mock.MagicMock(instance)
-        self.assertIsInstance(mock_instance.__aenter__,
-                              asynctest.mock.CoroutineMock)
-        self.assertIsInstance(mock_instance.__aexit__,
-                              asynctest.mock.CoroutineMock)
+        for spec in (None, self.WithAsyncContextManager()):
+            with self.subTest(spec=spec):
+                mock_instance = asynctest.mock.MagicMock(spec)
+                self.assertIsInstance(mock_instance.__aenter__,
+                                      asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock_instance.__aexit__,
+                                      asynctest.mock.CoroutineMock)
 
     def test_mock_supports_async_context_manager(self, klass):
         called = False

@@ -23,7 +23,12 @@ import unittest.mock
 
 if sys.version_info >= (3, 5):
     from . import _awaitable
-    _async_magics = ("aenter", "aexit", "aiter", "anext")
+
+    async_magic_coroutines = ("__aenter__", "__aexit__", "__anext__")
+    _async_magics = async_magic_coroutines + ("__aiter__", )
+
+    async_magic_coroutines = set(async_magic_coroutines)
+    _async_magics = set(_async_magics)
 
     # We use unittest.mock.MagicProxy which works well, but it's not aware that
     # we want __aexit__ to return a falsy value by default.
@@ -46,13 +51,10 @@ if sys.version_info >= (3, 5):
 
         return __aiter__
 
-
     unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
 else:
     _awaitable = None
-    _async_magics = ()
-
-_async_magics = set(map("__{}__".format, _async_magics))
+    async_magic_coroutines = _async_magics = set()
 
 
 # From python 3.6, a sentinel object is used to mark coroutines (rather than
@@ -139,6 +141,10 @@ def _get_child_mock(self, *args, **kwargs):
         return CoroutineMock(*args, **kwargs)
 
     _type = type(self)
+
+    if (issubclass(_type, MagicMock) and _new_name in async_magic_coroutines):
+        return CoroutineMock(*args, **kwargs)
+
     if not issubclass(_type, unittest.mock.CallableMixin):
         if issubclass(_type, unittest.mock.NonCallableMagicMock):
             klass = MagicMock
