@@ -201,22 +201,21 @@ class _Test_Mock_Of_Async_Magic_Methods:
             return accumulator
 
         expected = ["FOO", "BAR", "BAZ"]
-        classes = self.get_async_iterator_classes()
-        for iterator_class in classes:
-            instance = iterator_class()
-
+        specs = [None]
+        specs.extend(i() for i in self.get_async_iterator_classes())
+        for spec in specs:
             with self.subTest("iterate through default value"):
-                mock_instance = asynctest.MagicMock(instance)
+                mock_instance = asynctest.MagicMock(spec)
                 self.assertEqual([], run_coroutine(iterate(mock_instance)))
 
             with self.subTest("iterate through set return_value"):
-                mock_instance = asynctest.MagicMock(instance)
+                mock_instance = asynctest.MagicMock(spec)
                 mock_instance.__aiter__.return_value = expected[:]
 
                 self.assertEqual(expected, run_coroutine(iterate(mock_instance)))
 
             with self.subTest("iterate through set return_value iterator"):
-                mock_instance = asynctest.MagicMock(instance)
+                mock_instance = asynctest.MagicMock(spec)
                 mock_instance.__aiter__.return_value = iter(expected[:])
 
                 self.assertEqual(expected, run_coroutine(iterate(mock_instance)))
