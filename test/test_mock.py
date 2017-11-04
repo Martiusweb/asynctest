@@ -271,7 +271,8 @@ class Test_MagicMock(unittest.TestCase, _Test_subclass,
     class_to_test = 'MagicMock'
 
 
-class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine):
+class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
+                         _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
     class_to_test = 'CoroutineMock'
 
     def test_asyncio_iscoroutinefunction(self):

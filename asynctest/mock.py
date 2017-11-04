@@ -143,9 +143,10 @@ def _get_child_mock(self, *args, **kwargs):
     _type = type(self)
 
     if (issubclass(_type, MagicMock) and _new_name in async_magic_coroutines):
-        return CoroutineMock(*args, **kwargs)
-
-    if not issubclass(_type, unittest.mock.CallableMixin):
+        klass = CoroutineMock
+    elif issubclass(_type, CoroutineMock):
+        klass = MagicMock
+    elif not issubclass(_type, unittest.mock.CallableMixin):
         if issubclass(_type, unittest.mock.NonCallableMagicMock):
             klass = MagicMock
         elif issubclass(_type, NonCallableMock):
@@ -409,10 +410,9 @@ class CoroutineMock(Mock):
 
         # asyncio.iscoroutinefunction() checks this property to say if an
         # object is a coroutine
-        self._is_coroutine = _is_coroutine
-
-    def _get_child_mock(self, **kwargs):
-        return MagicMock(**kwargs)
+        # It is set through __dict__ because when spec_set is True, this
+        # attribute is likely undefined.
+        self.__dict__['_is_coroutine'] = _is_coroutine
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
