@@ -2,33 +2,33 @@
 """
 asynctest setup script.
 
-Currently, only basic distribution features are required, hence distutils is
-sufficient, and we won't use setuptools.
+We rely on setuptools >= 30.3.0 to read setup.cfg, but provide a minimal
+support with distutils.
 """
-
-from setuptools import setup
 
 args = {
     "name": "asynctest",
-    "version": "0.11.1",
-    "description": "Enhance the standard unittest package with features for "
-                   "testing asyncio libraries",
-    "author": "Martin Richard",
-    "author_email": "martius@martiusweb.net",
-    "url": "https://github.com/Martiusweb/asynctest/",
-    "license": "Apache 2",
     "packages": ["asynctest"],
-    "classifiers": [
-        'Development Status :: 3 - Alpha',
-        'Intended Audience :: Developers',
-        'Topic :: Software Development :: Testing',
-        'License :: OSI Approved :: Apache Software License',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-    ],
-    "keywords": 'unittest test testing asyncio tulip selectors async mock',
 }
 
+try:
+    # We don't use this method, but it allows to detect if setuptools will read
+    # the setup.cfg file or if we need to find the version by ourselves.
+    from setuptools.config import read_configuration  # noqa
+except ImportError:
+    import configparser
+    import os
+
+    with open(os.path.join(os.path.dirname(__file__), "setup.cfg")) as cfg:
+        config = configparser.ConfigParser()
+        config.read_file(cfg, source="setup.cfg")
+        args['version'] = config['metadata']['version']
+
+
 if __name__ == "__main__":
+    try:
+        from setuptools import setup
+    except ImportError:
+        from distutils.core import setup
+
     setup(**args)
