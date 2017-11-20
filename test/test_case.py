@@ -107,6 +107,10 @@ class Test_TestCase(_TestCase):
 
                 mock.assert_called_with()
                 mock_loop.close.assert_called_with()
+
+                if sys.version_info >= (3, 6):
+                    mock_loop.run_until_complete.__wrapped__.assert_called_with(mock_loop.shutdown_asyncgens())
+
                 self.assertFalse(case.failing)
                 self.assertIs(default_loop, asyncio.get_event_loop())
 

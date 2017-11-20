@@ -46,6 +46,7 @@ import asyncio
 import functools
 import types
 import unittest.case
+import sys
 import warnings
 
 from unittest.case import *  # NOQA
@@ -201,6 +202,8 @@ class TestCase(unittest.case.TestCase):
         policy = asyncio.get_event_loop_policy()
 
         if not self.use_default_loop:
+            if sys.version_info >= (3, 6):
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
             self.loop.close()
             policy.reset_watcher()
 
