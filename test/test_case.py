@@ -338,6 +338,40 @@ class Test_TestCase(_TestCase):
                 if outcome:
                     self.assertTrue(outcome.wasSuccessful())
 
+    def test_with_timeout(self):
+        class ArgumentWithTimeoutTest(asynctest.TestCase):
+            @asynctest.TestCase.with_timeout(0.1)
+            @asyncio.coroutine
+            def runTest(self):
+                yield from asyncio.sleep(0.5)
+
+        class OverrideWithTimeoutTest(asynctest.TestCase):
+            default_timeout = 0.1
+
+            @asynctest.TestCase.with_timeout()
+            @asyncio.coroutine
+            def runTest(self):
+                yield from asyncio.sleep(0.5)
+
+        class EnvironWithTimeoutTest(asynctest.TestCase):
+            @asynctest.TestCase.with_timeout()
+            @asyncio.coroutine
+            def runTest(self):
+                yield from asyncio.sleep(0.5)
+
+        cases = [ArgumentWithTimeoutTest(), OverrideWithTimeoutTest()]
+
+        for case in cases:
+            with self.subTest(case=case):
+                with self.assertRaises(asyncio.TimeoutError):
+                    case.debug()
+
+        with unittest.mock.patch.dict(os.environ, {'ASYNCTEST_TIMEOUT': '0.1'}):
+            case = EnvironWithTimeoutTest()
+            with self.subTest(case=case):
+                with self.assertRaises(asyncio.TimeoutError):
+                    case.debug()
+
 
 @unittest.skipIf(sys.platform == "win32", "Tests specific to Unix")
 class Test_TestCase_and_ChildWatcher(_TestCase):
