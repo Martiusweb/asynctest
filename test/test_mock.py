@@ -218,7 +218,7 @@ class _Test_Spec_Spec_Set_Is_Function:
         spec = Test.a_function
 
         for attr in ('spec', 'spec_set', ):
-            with self.subTest(sepc_type=attr):
+            with self.subTest(spec_type=attr):
                 mock = klass(**{attr: spec})
                 self.assertFalse(asyncio.iscoroutinefunction(mock))
                 if hasattr(inspect, "iscoroutinefunction"):
