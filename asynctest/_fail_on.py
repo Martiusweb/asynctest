@@ -5,6 +5,20 @@ tests.
 
 This module is separated from :mod:`asynctest.case` to avoid circular imports
 in modules registering new checks.
+
+To implement new checks:
+
+    * its name must be added in the ``DEFAULTS`` dict,
+
+    * a static method of the same name must be added to the :class:`_fail_on`
+      class,
+
+    * an optional static method named ``before_[name of the check]`` can be
+      added to :class:`_fail_on` to implement some set-up before the test runs.
+
+A check may be only available on some platforms, activated by a conditional
+import. In this case, ``DEFAULT`` and :class:`_fail_on` can be updated in the
+module. There is an example in the :mod:`asynctest.selector` module.
 """
 from asyncio import TimerHandle
 
@@ -12,6 +26,9 @@ from asyncio import TimerHandle
 _FAIL_ON_ATTR = "_asynctest_fail_on"
 
 
+#: Default value of the arguments of @fail_on, the name of the argument matches
+#: the name of the static method performing the check in the :class:`_fail_on`.
+#: The value is True when the check is enabled by default, False otherwise.
 DEFAULTS = {
     "unused_loop": True,
     "active_handles": False,
