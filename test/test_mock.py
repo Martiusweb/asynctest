@@ -34,6 +34,10 @@ class Test:
     a_second_dict = {'is_patched': False}
 
 
+class ProbeException(Exception):
+    pass
+
+
 if _using_await:
     Test = _using_await.patch_Test_Class(Test)
 
@@ -156,10 +160,10 @@ class _Test_called_coroutine:
 
     def test_exception_side_effect_raises_in_coroutine(self, klass):
         mock = klass()
-        mock.side_effect = Exception
+        mock.side_effect = ProbeException
 
         coroutine = mock()
-        with self.assertRaises(Exception):
+        with self.assertRaises(ProbeException):
             run_coroutine(coroutine)
 
     def test_returns_coroutine_from_side_effect_being_an_iterable(self, klass):
@@ -1439,18 +1443,15 @@ class Test_create_autospec(unittest.TestCase):
             self.assertEqual("PROBE2", run_coroutine(mock(None)))
 
     def test_create_autospec_on_coroutine_with_exception_side_effect(self):
-        exception = Exception()
         coroutines = [Test.a_coroutine]
         if _using_await:
             coroutines.append(Test.an_async_coroutine)
 
         for a_coroutine in coroutines:
             mock = asynctest.mock.create_autospec(a_coroutine,
-                                                  side_effect=exception)
-            with self.assertRaises(Exception) as ctx:
+                                                  side_effect=ProbeException)
+            with self.assertRaises(ProbeException):
                 run_coroutine(mock(None))
-
-            self.assertIs(ctx.exception, exception)
 
     def test_create_autospec_on_coroutine_with_coroutine_side_effect(self):
         coroutines = [Test.a_coroutine]
