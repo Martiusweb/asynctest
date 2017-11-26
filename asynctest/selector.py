@@ -19,7 +19,12 @@ except ImportError:
     # modules from within the asyncio package
     import asyncio.selectors as selectors
 import socket
-import ssl
+
+try:
+    import ssl
+except ImportError:
+    # allow python to be compiled without ssl
+    ssl = None
 
 from . import mock
 from . import _fail_on
@@ -121,20 +126,21 @@ class SocketMock(FileMock):
                          spec_set=spec_set, parent=parent, **kwargs)
 
 
-class SSLSocketMock(SocketMock):
-    """
-    Mock a socket wrapped by the :mod:`ssl` module.
+if ssl:
+    class SSLSocketMock(SocketMock):
+        """
+        Mock a socket wrapped by the :mod:`ssl` module.
 
-    See :class:`~asynctest.FileMock`.
+        See :class:`~asynctest.FileMock`.
 
-    .. versionadded:: 0.5
-    """
-    def __init__(self, side_effect=None, return_value=mock.DEFAULT,
-                 wraps=None, name=None, spec_set=None, parent=None,
-                 **kwargs):
-        FileMock.__init__(self, ssl.SSLSocket, side_effect=side_effect,
-                          return_value=return_value, wraps=wraps, name=name,
-                          spec_set=spec_set, parent=parent, **kwargs)
+        .. versionadded:: 0.5
+        """
+        def __init__(self, side_effect=None, return_value=mock.DEFAULT,
+                     wraps=None, name=None, spec_set=None, parent=None,
+                     **kwargs):
+            FileMock.__init__(self, ssl.SSLSocket, side_effect=side_effect,
+                              return_value=return_value, wraps=wraps, name=name,
+                              spec_set=spec_set, parent=parent, **kwargs)
 
 
 def _set_event_ready(fileobj, loop, event):

@@ -6,7 +6,10 @@ import selectors
 import functools
 import os
 import socket
-import ssl
+try:
+    import ssl
+except ImportError:
+    ssl = None
 import sys
 import unittest
 
@@ -45,9 +48,11 @@ class Test_SocketMock(Selector_TestCase):
         self.assertIsInstance(asynctest.selector.SocketMock(), socket.socket)
 
 
-class Test_SSLSocketMock(Selector_TestCase):
-    def test_is_ssl_socket(self):
-        self.assertIsInstance(asynctest.selector.SSLSocketMock(), ssl.SSLSocket)
+if ssl:
+    class Test_SSLSocketMock(Selector_TestCase):
+        def test_is_ssl_socket(self):
+            self.assertIsInstance(asynctest.selector.SSLSocketMock(),
+                                  ssl.SSLSocket)
 
 
 def selector_subtest(method):
