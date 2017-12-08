@@ -414,6 +414,9 @@ class CoroutineMock(Mock):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
     """
+    awaited = unittest.mock._delegating_property('awaited')
+    await_count = unittest.mock._delegating_property('await_count')
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -422,15 +425,31 @@ class CoroutineMock(Mock):
         # It is set through __dict__ because when spec_set is True, this
         # attribute is likely undefined.
         self.__dict__['_is_coroutine'] = _is_coroutine
+        self.__dict__['_mock_awaited'] = asyncio.Event()
+        self.__dict__['_mock_await_count'] = 0
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
             result = super()._mock_call(*args, **kwargs)
 
-            if asyncio.iscoroutine(result):
-                return result
+            if inspect.isawaitable(result):
+                @asyncio.coroutine
+                def proxy():
+                    try:
+                        return (yield from result)
+                    finally:
+                        _mock_self.await_count += 1
+                        _mock_self.awaited.set()
             else:
-                return asyncio.coroutine(lambda *a, **kw: result)()
+                @asyncio.coroutine
+                def proxy():
+                    try:
+                        return result
+                    finally:
+                        _mock_self.await_count += 1
+                        _mock_self.awaited.set()
+
+            return proxy()
         except StopIteration as e:
             side_effect = _mock_self.side_effect
             if side_effect is not None and not callable(side_effect):
@@ -439,6 +458,11 @@ class CoroutineMock(Mock):
             return asyncio.coroutine(_raise)(e)
         except BaseException as e:
             return asyncio.coroutine(_raise)(e)
+
+    def reset_mock(self, *args, **kwargs):
+        super().reset_mock(*args, **kwargs)
+        self.awaited = asyncio.Event()
+        self.await_count = 0
 
 
 def create_autospec(spec, spec_set=False, instance=False, _parent=None,

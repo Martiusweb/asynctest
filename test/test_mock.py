@@ -304,6 +304,23 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
         mock = asynctest.mock.CoroutineMock()
         self.assertIsInstance(run_coroutine(mock()), asynctest.mock.MagicMock)
 
+    def test_awaited_CoroutineMock_sets_awaited(self):
+        mock = asynctest.mock.CoroutineMock()
+        run_coroutine(mock())
+        self.assertTrue(mock.awaited.is_set())
+
+        mock.reset_mock()
+        self.assertFalse(mock.awaited.is_set())
+
+    def test_awaited_CoroutineMock_counts(self):
+        mock = asynctest.mock.CoroutineMock()
+        run_coroutine(mock())
+        run_coroutine(mock())
+        self.assertEqual(mock.await_count, 2)
+
+        mock.reset_mock()
+        self.assertEqual(mock.await_count, 0)
+
 
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
