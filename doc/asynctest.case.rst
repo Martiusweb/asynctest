@@ -44,13 +44,13 @@
         Enable or disable a check using a keywork argument with a boolean
         value::
 
-            @asynctest.fail_on(unused_loop=False)
+            @asynctest.fail_on(unused_loop=True)
             class TestCase(asynctest.TestCase):
                 ...
 
         Available checks are:
 
-            * ``unused_loop``: enabled by default, checks that the loop ran at
+            * ``unused_loop``: disabled by default, checks that the loop ran at
               least once during the test. This check can not fail if the test
               method is a coroutine. This allows to detect cases where a test
               author assume its test will run tasks or callbacks on the loop,
@@ -79,7 +79,14 @@
         .. versionadded:: 0.8
 
         .. versionadded:: 0.9
-            ``active_handles``
+           ``active_handles``
+
+        .. versionadded:: 0.12
+           ``unused_loop`` is now deactivated by default to maintain
+           compatibility with non-async test inherited from
+           :class:`unittest.TestCase`. This check is especially useful to track
+           missing ``@asyncio.coroutine`` decorators in a codebase that must be
+           compatbible with Python 3.4.
 
     .. decorator:: strict
 
