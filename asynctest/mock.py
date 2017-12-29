@@ -1039,7 +1039,36 @@ class _patch(unittest.mock._patch):
                     patching.__enter__()
             return self.mock_to_reuse
         else:
-            return super().__enter__()
+            return self._perform_patch()
+
+    def _perform_patch(self):
+        # This will intercept the result of super().__enter__() if we need to
+        # override the default behavior (ie: we need to use our own autospec).
+        original, local = self.get_original()
+        result = super().__enter__()
+
+        if self.autospec is None or not self.autospec:
+            # no need to override the default behavior
+            return result
+
+        if self.autospec is True:
+            autospec = original
+        else:
+            autospec = self.autospec
+
+        new = create_autospec(autospec, spec_set=bool(self.spec_set),
+                              _name=self.attribute, **self.kwargs)
+
+        self.temp_original = original
+        self.is_local = local
+        setattr(self.target, self.attribute, new)
+
+        if self.attribute_name is not None:
+            if self.new is DEFAULT:
+                result[self.attribute_name] = new
+            return result
+
+        return new
 
     def decorate_callable(self, func):
         wrapped = _decorate_coroutine_callable(func, self)

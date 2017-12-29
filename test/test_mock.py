@@ -908,6 +908,34 @@ class Test_patch_dict(unittest.TestCase):
         self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
 
 
+class Test_patch_autospec(unittest.TestCase):
+    def test_autospec_coroutine(self):
+        test_class_path = "{}.Test".format(__name__)
+        called = False
+
+        @asynctest.mock.patch(test_class_path, autospec=True)
+        def patched(mock):
+            nonlocal called
+            called = True
+            self.assertIsInstance(mock.a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
+            self.assertIsInstance(mock().a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
+            self.assertIsInstance(mock.a_function, asynctest.mock.Mock)
+            self.assertIsInstance(mock().a_function, asynctest.mock.Mock)
+
+            if _using_await:
+                self.assertIsInstance(mock.an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock().an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
+
+        patched()
+        self.assertTrue(called)
+
+
 #
 # patch scopes
 #
