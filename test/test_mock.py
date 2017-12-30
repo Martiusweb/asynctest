@@ -909,11 +909,12 @@ class Test_patch_dict(unittest.TestCase):
 
 
 class Test_patch_autospec(unittest.TestCase):
+    test_class_path = "{}.Test".format(__name__)
+
     def test_autospec_coroutine(self):
-        test_class_path = "{}.Test".format(__name__)
         called = False
 
-        @asynctest.mock.patch(test_class_path, autospec=True)
+        @asynctest.mock.patch(self.test_class_path, autospec=True)
         def patched(mock):
             nonlocal called
             called = True
@@ -933,6 +934,44 @@ class Test_patch_autospec(unittest.TestCase):
                                       asynctest.mock.CoroutineMock)
 
         patched()
+        self.assertTrue(called)
+
+    def test_patch_autospec_with_patches_on_top(self):
+        called = False
+
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "is_patched"),
+                              return_value=True)
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "a_coroutine"),
+                              autospec=True)
+        def patched_function(coroutine_mock, is_patched_mock):
+            nonlocal called
+            called = True
+
+            self.assertIsInstance(Test.is_patched, asynctest.mock.Mock)
+            self.assertTrue(Test.is_patched())
+            self.assertTrue(asyncio.iscoroutinefunction(coroutine_mock))
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine))
+
+        patched_function()
+        self.assertTrue(called)
+
+    def test_patch_autospec_with_patches_under(self):
+        called = False
+
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "a_coroutine"),
+                              autospec=True)
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "is_patched"),
+                              return_value=True)
+        def patched_function(is_patched_mock, coroutine_mock):
+            nonlocal called
+            called = True
+
+            self.assertIsInstance(Test.is_patched, asynctest.mock.Mock)
+            self.assertTrue(Test.is_patched())
+            self.assertTrue(asyncio.iscoroutinefunction(coroutine_mock))
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine))
+
+        patched_function()
         self.assertTrue(called)
 
 
