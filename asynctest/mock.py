@@ -432,7 +432,14 @@ class CoroutineMock(Mock):
         try:
             result = super()._mock_call(*args, **kwargs)
 
-            if inspect.isawaitable(result):
+            try:
+                # Python 3.5+
+                isawaitable = inspect.isawaitable
+            except AttributeError:
+                # Python 3.4
+                isawaitable = lambda x: asyncio.iscoroutine(x)
+
+            if isawaitable(result):
                 @asyncio.coroutine
                 def proxy():
                     try:
