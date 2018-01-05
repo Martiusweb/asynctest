@@ -562,6 +562,17 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             # _set_signature returns the result of the CoroutineMock itself,
             # which is a Coroutine (as defined in CoroutineMock._mock_call)
             mock._is_coroutine = _is_coroutine
+            mock.awaited = _AwaitEvent()
+            mock.await_count = 0
+
+            def assert_awaited(self, *args, **kwargs):
+                return self.mock.assert_awaited(*args, **kwargs)
+
+            def assert_not_awaited(self, *args, **kwargs):
+                return self.mock.assert_not_awaited(*args, **kwargs)
+
+            mock.assert_awaited = assert_awaited
+            mock.assert_not_awaited = assert_not_awaited
     else:
         unittest.mock._check_signature(spec, mock, is_type, instance)
 
