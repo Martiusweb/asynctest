@@ -376,6 +376,14 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     """
 
 
+class _AwaitEvent(asyncio.Event):
+    """
+    A mix between asyncio.Event and bool.
+    """
+    def __bool__(self):
+        return self.is_set()
+
+
 class CoroutineMock(Mock):
     """
     Enhance :class:`~asynctest.mock.Mock` with features allowing to mock
@@ -425,7 +433,7 @@ class CoroutineMock(Mock):
         # It is set through __dict__ because when spec_set is True, this
         # attribute is likely undefined.
         self.__dict__['_is_coroutine'] = _is_coroutine
-        self.__dict__['_mock_awaited'] = asyncio.Event()
+        self.__dict__['_mock_awaited'] = _AwaitEvent()
         self.__dict__['_mock_await_count'] = 0
 
     def _mock_call(_mock_self, *args, **kwargs):
@@ -466,9 +474,29 @@ class CoroutineMock(Mock):
         except BaseException as e:
             return asyncio.coroutine(_raise)(e)
 
+    def assert_awaited(_mock_self):
+        """
+        Assert that the mock was awaited.
+        """
+        self = _mock_self
+        if self.await_count == 0:
+            msg = ("Expected '%s' to have been awaited." %
+                   self._mock_name or 'mock')
+            raise AssertionError(msg)
+
+    def assert_not_awaited(_mock_self):
+        """
+        Assert that the mock was never awaited.
+        """
+        self = _mock_self
+        if self.await_count != 0:
+            msg = ("Expected '%s' to not have been awaited. Awaited %s times." %
+                   (self._mock_name or 'mock', self.await_count))
+            raise AssertionError(msg)
+
     def reset_mock(self, *args, **kwargs):
         super().reset_mock(*args, **kwargs)
-        self.awaited = asyncio.Event()
+        self.awaited = _AwaitEvent()
         self.await_count = 0
 
 

@@ -307,10 +307,25 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
     def test_awaited_CoroutineMock_sets_awaited(self):
         mock = asynctest.mock.CoroutineMock()
         run_coroutine(mock())
+        mock.assert_awaited()
         self.assertTrue(mock.awaited.is_set())
+        self.assertTrue(mock.awaited)
 
         mock.reset_mock()
+        mock.assert_not_awaited()
         self.assertFalse(mock.awaited.is_set())
+        self.assertFalse(mock.awaited)
+
+        @asyncio.coroutine
+        def side_effect():
+            raise RuntimeError()
+
+        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+
+        with self.assertRaises(RuntimeError):
+            run_coroutine(mock())
+
+        mock.assert_awaited()
 
     def test_awaited_CoroutineMock_counts(self):
         mock = asynctest.mock.CoroutineMock()
@@ -321,6 +336,16 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
         mock.reset_mock()
         self.assertEqual(mock.await_count, 0)
 
+        @asyncio.coroutine
+        def side_effect():
+            raise RuntimeError()
+
+        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+
+        with self.assertRaises(RuntimeError):
+            run_coroutine(mock())
+
+        self.assertEqual(mock.await_count, 1)
 
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
