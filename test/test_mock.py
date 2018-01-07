@@ -347,6 +347,21 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
 
         self.assertEqual(mock.await_count, 1)
 
+    def test_awaited_from_autospec_mock(self):
+        mock = asynctest.mock.create_autospec(Test)
+        mock.a_coroutine.assert_not_awaited()
+        self.assertFalse(mock.a_coroutine.awaited)
+        self.assertFalse(mock.a_coroutine.awaited.is_set())
+        self.assertEqual(0, mock.a_coroutine.await_count)
+
+        run_coroutine(mock.a_coroutine())
+
+        mock.a_coroutine.assert_awaited()
+        self.assertTrue(mock.a_coroutine.awaited)
+        self.assertTrue(mock.a_coroutine.awaited.is_set())
+        self.assertEqual(1, mock.a_coroutine.await_count)
+
+
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
         'NonCallableMagicMock': 'NonCallableMock',

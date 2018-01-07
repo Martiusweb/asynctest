@@ -570,6 +570,9 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
                  name=_name, **_kwargs)
 
     if isinstance(spec, unittest.mock.FunctionTypes):
+        wrapped_mock = mock
+        # _set_signature returns an object wrapping the mock, not the mock
+        # itself.
         mock = unittest.mock._set_signature(mock, spec)
         if is_coroutine_func:
             # Can't wrap the mock with asyncio.coroutine because it doesn't
@@ -581,11 +584,11 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             mock.awaited = _AwaitEvent()
             mock.await_count = 0
 
-            def assert_awaited(self, *args, **kwargs):
-                return self.mock.assert_awaited(*args, **kwargs)
+            def assert_awaited(*args, **kwargs):
+                return wrapped_mock.assert_awaited(*args, **kwargs)
 
-            def assert_not_awaited(self, *args, **kwargs):
-                return self.mock.assert_not_awaited(*args, **kwargs)
+            def assert_not_awaited(*args, **kwargs):
+                return wrapped_mock.assert_not_awaited(*args, **kwargs)
 
             mock.assert_awaited = assert_awaited
             mock.assert_not_awaited = assert_not_awaited
