@@ -429,7 +429,16 @@ class CoroutineMock(Mock):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
     """
+    #: Property behaving like an :class:`asyncio.Event` instance which is set
+    #: when the mock is awaited. Unlike :class:`asyncio.Event`, the boolean
+    #: value of this object is false if the event is not set (ie:
+    #: ``bool(mock.awaited)`` is ``False`` if the mock has not been awaited).
+    #:
+    #: .. versionadded:: 0.12
     awaited = unittest.mock._delegating_property('awaited')
+    #: Number of times the mock has been awaited (or "yielded from").
+    #:
+    #: .. versionadded:: 0.12
     await_count = unittest.mock._delegating_property('await_count')
 
     def __init__(self, *args, **kwargs):
@@ -476,7 +485,9 @@ class CoroutineMock(Mock):
 
     def assert_awaited(_mock_self):
         """
-        Assert that the mock was awaited.
+        Assert that the mock was awaited at least once.
+
+        .. versionadded:: 0.12
         """
         self = _mock_self
         if self.await_count == 0:
@@ -487,6 +498,8 @@ class CoroutineMock(Mock):
     def assert_not_awaited(_mock_self):
         """
         Assert that the mock was never awaited.
+
+        .. versionadded:: 0.12
         """
         self = _mock_self
         if self.await_count != 0:
@@ -495,6 +508,9 @@ class CoroutineMock(Mock):
             raise AssertionError(msg)
 
     def reset_mock(self, *args, **kwargs):
+        """
+        See :func:`unittest.mock.Mock.reset_mock()`
+        """
         super().reset_mock(*args, **kwargs)
         self.awaited = _AwaitEvent()
         self.await_count = 0
@@ -512,7 +528,7 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
     If ``spec`` is a coroutine function, and ``instance`` is not ``False``, a
     :exc:`RuntimeError` is raised.
 
-    versionadded:: 0.12
+    .. versionadded:: 0.12
     """
     if unittest.mock._is_list(spec):
         spec = type(spec)
