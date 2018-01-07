@@ -11,18 +11,23 @@ args = {
     "packages": ["asynctest"],
 }
 
-try:
-    # We don't use this method, but it allows to detect if setuptools will read
-    # the setup.cfg file or if we need to find the version by ourselves.
-    from setuptools.config import read_configuration  # noqa
-except ImportError:
+
+def read_version():
     import configparser
     import os
 
     with open(os.path.join(os.path.dirname(__file__), "setup.cfg")) as cfg:
         config = configparser.ConfigParser()
         config.read_file(cfg, source="setup.cfg")
-        args['version'] = config['metadata']['version']
+        return config['metadata']['version']
+
+
+try:
+    # We don't use this method, but it allows to detect if setuptools will read
+    # the setup.cfg file or if we need to find the version by ourselves.
+    from setuptools.config import read_configuration  # noqa
+except ImportError:
+        args['version'] = read_version()
 
 
 if __name__ == "__main__":

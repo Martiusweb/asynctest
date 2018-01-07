@@ -21,7 +21,15 @@ import os
 sys.path.insert(0, os.path.abspath('..'))  # NOQA
 
 
-from setup import args as setup_args
+try:
+    from setuptools.config import read_configuration
+    cfg_path = os.path.join(os.path.dirname(__file__), '..', 'setup.cfg')
+    setup_args = read_configuration(cfg_path)['metadata']
+except ImportError:
+    from setup import args as setup_args, read_version
+    setup_args["author"] = "Martin Richard"
+    setup_args["description"] = ""
+    setup_args["version"] = read_version()
 
 # -- General configuration ------------------------------------------------
 
