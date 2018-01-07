@@ -65,6 +65,13 @@ except AttributeError:
     _is_coroutine = True
 
 
+try:
+    # Python 3.5+
+    _isawaitable = inspect.isawaitable
+except AttributeError:
+    _isawaitable = asyncio.iscoroutine
+
+
 def _raise(exception):
     raise exception
 
@@ -440,14 +447,7 @@ class CoroutineMock(Mock):
         try:
             result = super()._mock_call(*args, **kwargs)
 
-            try:
-                # Python 3.5+
-                isawaitable = inspect.isawaitable
-            except AttributeError:
-                # Python 3.4
-                isawaitable = lambda x: asyncio.iscoroutine(x)
-
-            if isawaitable(result):
+            if _isawaitable(result):
                 @asyncio.coroutine
                 def proxy():
                     try:
