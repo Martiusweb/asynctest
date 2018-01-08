@@ -777,8 +777,9 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     A context manager, function decorator or class decorator which patches the
     target with the value given by ther new argument.
 
-    If ``new`` isn't provided, the default is a
-    :class:`~asynctest.CoroutineMock` if the patched object is a coroutine, or
+    ``new`` specifies which object will replace the ``target`` when the patch
+    is applied. By default, the target will be patched with an instance of
+    :class:`~asynctest.CoroutineMock` if it is a coroutine, or
     a :class:`~asynctest.MagicMock` object.
 
     It is a replacement to :func:`unittest.mock.patch`, but using
