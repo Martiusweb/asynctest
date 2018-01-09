@@ -8,7 +8,7 @@ import sys
 
 import asynctest
 
-from .utils import run_coroutine
+from .utils import run_coroutine, replace_loop
 
 if sys.version_info >= (3, 5):
     from . import test_mock_await as _using_await
@@ -308,12 +308,10 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
         mock = asynctest.mock.CoroutineMock()
         run_coroutine(mock())
         mock.assert_awaited()
-        self.assertTrue(mock.awaited.is_set())
         self.assertTrue(mock.awaited)
 
         mock.reset_mock()
         mock.assert_not_awaited()
-        self.assertFalse(mock.awaited.is_set())
         self.assertFalse(mock.awaited)
 
         @asyncio.coroutine
@@ -351,15 +349,47 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
         mock = asynctest.mock.create_autospec(Test)
         mock.a_coroutine.assert_not_awaited()
         self.assertFalse(mock.a_coroutine.awaited)
-        self.assertFalse(mock.a_coroutine.awaited.is_set())
         self.assertEqual(0, mock.a_coroutine.await_count)
 
         run_coroutine(mock.a_coroutine())
 
         mock.a_coroutine.assert_awaited()
         self.assertTrue(mock.a_coroutine.awaited)
-        self.assertTrue(mock.a_coroutine.awaited.is_set())
         self.assertEqual(1, mock.a_coroutine.await_count)
+
+    def test_awaited_wait(self):
+        loop = asyncio.new_event_loop()
+        with replace_loop(loop):
+            mock = asynctest.mock.CoroutineMock()
+            t = asyncio.ensure_future(mock.awaited.wait())
+            run_coroutine(mock(), loop)
+            run_coroutine(t, loop)
+
+            mock.reset_mock()
+            t = asyncio.ensure_future(mock.awaited.wait(skip=1))
+            run_coroutine(mock(), loop)
+            self.assertFalse(t.done())
+            run_coroutine(mock(), loop)
+            run_coroutine(t, loop)
+
+    def test_awaited_wait_next(self):
+        loop = asyncio.new_event_loop()
+        with replace_loop(loop):
+            mock = asynctest.mock.CoroutineMock()
+            run_coroutine(mock(), loop)
+            t = asyncio.ensure_future(mock.awaited.wait_next())
+            run_coroutine(asyncio.sleep(0.01), loop)
+            self.assertFalse(t.done())
+            run_coroutine(mock(), loop)
+            run_coroutine(t, loop)
+
+            mock.reset_mock()
+            run_coroutine(mock(), loop)
+            t = asyncio.ensure_future(mock.awaited.wait_next(skip=1))
+            run_coroutine(mock(), loop)
+            self.assertFalse(t.done())
+            run_coroutine(mock(), loop)
+            run_coroutine(t, loop)
 
 
 class TestMockInheritanceModel(unittest.TestCase):

@@ -383,12 +383,73 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     """
 
 
-class _AwaitEvent(asyncio.Event):
-    """
-    A mix between asyncio.Event and bool.
-    """
+class _AwaitEvent:
+    def __init__(self, mock):
+        self._mock = mock
+        self._condition = asyncio.Condition()
+
+    @asyncio.coroutine
+    def wait(self, skip=0):
+        """
+        Wait for await.
+
+        :param skip: How many awaits will be skipped.
+                     As a result, the mock should be awaited at least
+                     ``skip + 1`` times.
+        """
+        def predicate(mock):
+            return mock.await_count > skip
+
+        return (yield from self.wait_for(predicate))
+
+    @asyncio.coroutine
+    def wait_next(self, skip=0):
+        """
+        Wait for the next await.
+
+        Unlike :meth:`wait` that counts any await, mock has to be awaited once more,
+        disregarding to the current :attr:`asynctest.CoroutineMock.await_count`.
+
+        :param skip: How many awaits will be skipped.
+                     As a result, the mock should be awaited at least
+                     ``skip + 1`` more times.
+        """
+        await_count = self._mock.await_count
+
+        def predicate(mock):
+            return mock.await_count > await_count + skip
+
+        return (yield from self.wait_for(predicate))
+
+    @asyncio.coroutine
+    def wait_for(self, predicate):
+        """
+        Wait for a given predicate to become True.
+
+        :param predicate: A callable that receives mock which result
+                          will be interpreted as a boolean value.
+                          The final predicate value is the return value.
+        """
+        try:
+            yield from self._condition.acquire()
+
+            def _predicate():
+                return predicate(self._mock)
+
+            return (yield from self._condition.wait_for(_predicate))
+        finally:
+            self._condition.release()
+
+    @asyncio.coroutine
+    def _notify(self):
+        try:
+            yield from self._condition.acquire()
+            self._condition.notify_all()
+        finally:
+            self._condition.release()
+
     def __bool__(self):
-        return self.is_set()
+        return self._mock.await_count != 0
 
 
 class CoroutineMock(Mock):
@@ -429,10 +490,9 @@ class CoroutineMock(Mock):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
     """
-    #: Property behaving like an :class:`asyncio.Event` instance which is set
-    #: when the mock is awaited. Unlike :class:`asyncio.Event`, the boolean
-    #: value of this object is false if the event is not set (ie:
-    #: ``bool(mock.awaited)`` is ``False`` if the mock has not been awaited).
+    #: Property which is set when the mock is awaited. Its ``wait``,
+    #: ``wait_next`` and ``wait_for`` coroutine methods can be used
+    #: to synchronize execution.
     #:
     #: .. versionadded:: 0.12
     awaited = unittest.mock._delegating_property('awaited')
@@ -449,7 +509,7 @@ class CoroutineMock(Mock):
         # It is set through __dict__ because when spec_set is True, this
         # attribute is likely undefined.
         self.__dict__['_is_coroutine'] = _is_coroutine
-        self.__dict__['_mock_awaited'] = _AwaitEvent()
+        self.__dict__['_mock_awaited'] = _AwaitEvent(self)
         self.__dict__['_mock_await_count'] = 0
 
     def _mock_call(_mock_self, *args, **kwargs):
@@ -463,7 +523,7 @@ class CoroutineMock(Mock):
                         return (yield from result)
                     finally:
                         _mock_self.await_count += 1
-                        _mock_self.awaited.set()
+                        yield from _mock_self.awaited._notify()
             else:
                 @asyncio.coroutine
                 def proxy():
@@ -471,7 +531,7 @@ class CoroutineMock(Mock):
                         return result
                     finally:
                         _mock_self.await_count += 1
-                        _mock_self.awaited.set()
+                        yield from _mock_self.awaited._notify()
 
             return proxy()
         except StopIteration as e:
@@ -512,7 +572,7 @@ class CoroutineMock(Mock):
         See :func:`unittest.mock.Mock.reset_mock()`
         """
         super().reset_mock(*args, **kwargs)
-        self.awaited = _AwaitEvent()
+        self.awaited = _AwaitEvent(self)
         self.await_count = 0
 
 
@@ -581,7 +641,7 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             # _set_signature returns the result of the CoroutineMock itself,
             # which is a Coroutine (as defined in CoroutineMock._mock_call)
             mock._is_coroutine = _is_coroutine
-            mock.awaited = _AwaitEvent()
+            mock.awaited = _AwaitEvent(mock)
             mock.await_count = 0
 
             def assert_awaited(*args, **kwargs):
