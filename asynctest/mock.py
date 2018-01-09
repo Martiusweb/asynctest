@@ -141,7 +141,7 @@ def _get_child_mock(self, *args, **kwargs):
 
     _type = type(self)
 
-    if (issubclass(_type, MagicMock) and _new_name in async_magic_coroutines):
+    if issubclass(_type, MagicMock) and _new_name in async_magic_coroutines:
         klass = CoroutineMock
     elif issubclass(_type, CoroutineMock):
         klass = MagicMock
@@ -180,7 +180,7 @@ class IsCoroutineArgMeta(MockMetaMixin):
                 '_asynctest_get_is_coroutine': _get_is_coroutine,
                 '_asynctest_set_is_coroutine': _set_is_coroutine,
                 'is_coroutine': property(_get_is_coroutine, _set_is_coroutine,
-                                         "True if the object mocked is a coroutine"),
+                                         doc="True if the object mocked is a coroutine"),
                 '_is_coroutine': property(_get_is_coroutine),
             })
 
@@ -218,8 +218,6 @@ class AsyncMagicMixin:
 
         if getattr(self, "_mock_methods", None) is not None:
             these_magics = _async_magics.intersection(self._mock_methods)
-
-            remove_magics = set()
             remove_magics = _async_magics - these_magics
 
             for entry in remove_magics:
@@ -718,11 +716,11 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
                 if patching.scope == LIMITED]
             return super().send(value)
 
-    def throw(self, exc):
+    def throw(self, exc, value=None, traceback=None):
         with contextlib.ExitStack() as stack:
             [stack.enter_context(patching) for patching in self.patchings
                 if patching.scope == LIMITED]
-            return self.gen.throw(exc)
+            return self.gen.throw(exc, value, traceback)
 
     def __del__(self):
         # The generator/coroutine is deleted before it terminated, we must
