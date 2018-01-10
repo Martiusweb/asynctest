@@ -386,7 +386,7 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
 class _AwaitEvent:
     def __init__(self, mock):
         self._mock = mock
-        self._condition = asyncio.Condition()
+        self._condition = None
 
     @asyncio.coroutine
     def wait(self, skip=0):
@@ -430,23 +430,43 @@ class _AwaitEvent:
                           will be interpreted as a boolean value.
                           The final predicate value is the return value.
         """
+        c = self._get_condition()
+
         try:
-            yield from self._condition.acquire()
+            yield from c.acquire()
 
             def _predicate():
                 return predicate(self._mock)
 
-            return (yield from self._condition.wait_for(_predicate))
+            return (yield from c.wait_for(_predicate))
         finally:
-            self._condition.release()
+            c.release()
 
     @asyncio.coroutine
     def _notify(self):
+        c = self._get_condition()
+
         try:
-            yield from self._condition.acquire()
-            self._condition.notify_all()
+            yield from c.acquire()
+            c.notify_all()
         finally:
-            self._condition.release()
+            c.release()
+
+    def _get_condition(self):
+        """
+        Creation of condition is delayed, to minimize the change of using the wrong loop.
+
+        A user may create a mock with _AwaitEvent before selecting the execution loop.
+        Requiring a user to delay creation is error-prone and inflexible. Instead, condition
+        is created when user actually starts to use the mock.
+        """
+        # No synchronization is needed:
+        #   - asyncio is thread unsafe
+        #   - there are no awaits here, method will be executed without switching asyncio context.
+        if self._condition is None:
+            self._condition = asyncio.Condition()
+
+        return self._condition
 
     def __bool__(self):
         return self._mock.await_count != 0
