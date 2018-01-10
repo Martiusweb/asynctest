@@ -334,15 +334,6 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         run_coroutine(mock())
         self.assertIsNotNone(mock.awaited._condition)
 
-        @asyncio.coroutine
-        def f():
-            yield from mock.awaited._condition.acquire()
-            yield from mock.awaited._condition.acquire()
-
-        # Condition belongs to a loop created by run_coroutine, not current loop.
-        with self.assertRaises(RuntimeError):
-            run_coroutine(f())
-
     @asyncio.coroutine
     def test_awaited_CoroutineMock_sets_awaited(self):
         mock = asynctest.mock.CoroutineMock()
