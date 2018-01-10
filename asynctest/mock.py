@@ -92,7 +92,7 @@ class FakeInheritanceMeta(type):
     @staticmethod
     def __new(cls, *args, **kwargs):
         new = type(cls.__name__, (cls, ), {'__doc__': cls.__doc__})
-        return object.__new__(new)
+        return object.__new__(new, *args, **kwargs)
 
     def __instancecheck__(cls, obj):
         # That's tricky, each type(mock) is actually a subclass of the actual
@@ -117,7 +117,7 @@ def _get_is_coroutine(self):
 
 
 def _set_is_coroutine(self, value):
-    # property setters and getters are overriden by Mock(), we need to
+    # property setters and getters are overridden by Mock(), we need to
     # update the dict to add values
     value = _is_coroutine if bool(value) else False
     self.__dict__['_mock_is_coroutine'] = value
@@ -359,7 +359,7 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     :class:`MagicMock` allows to mock ``__aenter__``, ``__aexit__``,
     ``__aiter__`` and ``__anext__``.
 
-    When mocking an ansynchronous iterator, you can set the
+    When mocking an asynchronous iterator, you can set the
     ``return_value`` of ``__aiter__`` to an iterable to define the list of
     values to be returned during iteration.
 
@@ -445,13 +445,13 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
     Create a mock object using another object as a spec. Attributes on the mock
     will use the corresponding attribute on the spec object as their spec.
 
-    ``spec`` can be a coroutine function, a class or object with couroutine
+    ``spec`` can be a coroutine function, a class or object with coroutine
     functions as attributes.
 
     If ``spec`` is a coroutine function, and ``instance`` is not ``False``, a
     :exc:`RuntimeError` is raised.
 
-    versionadded:: 0.12
+    .. versionadded:: 0.12
     """
     if unittest.mock._is_list(spec):
         spec = type(spec)
@@ -616,7 +616,7 @@ def _decorate_coroutine_callable(func, new_patching):
 
     patchings = [new_patching]
 
-    def patched_factory(*args, **keywargs):
+    def patched_factory(*args, **kwargs):
         extra_args = []
         patchers_to_exit = []
         patch_dict_with_limited_scope = []
@@ -636,7 +636,7 @@ def _decorate_coroutine_callable(func, new_patching):
                         patch_dict_with_limited_scope.append(patching)
                 else:
                     if patching.attribute_name is not None:
-                        keywargs.update(arg)
+                        kwargs.update(arg)
                         if patching.new is DEFAULT:
                             patching.new = arg[patching.attribute_name]
                     elif patching.new is DEFAULT:
@@ -644,7 +644,7 @@ def _decorate_coroutine_callable(func, new_patching):
                         extra_args.append(arg)
 
             args += tuple(extra_args)
-            gen = func(*args, **keywargs)
+            gen = func(*args, **kwargs)
             return _PatchedGenerator(gen, patchings,
                                      asyncio.iscoroutinefunction(func))
         except BaseException:
@@ -773,7 +773,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
           autospec=None, new_callable=None, scope=GLOBAL, **kwargs):
     """
     A context manager, function decorator or class decorator which patches the
-    target with the value given by ther new argument.
+    target with the value given by the ``new`` argument.
 
     ``new`` specifies which object will replace the ``target`` when the patch
     is applied. By default, the target will be patched with an instance of

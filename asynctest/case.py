@@ -63,7 +63,7 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
         self.watcher = None
 
     # we override the loop from the original policy because we don't want to
-    # instanciate a "default loop" that may be never closed (usually, we only
+    # instantiate a "default loop" that may be never closed (usually, we only
     # run the test, so the "original default loop" is not even created by the
     # policy).
     def get_event_loop(self):
@@ -178,7 +178,7 @@ class TestCase(unittest.case.TestCase):
 
     #: If true, the value returned by :func:`asyncio.get_event_loop()` will be
     #: set to ``None`` during the test. It allows to ensure that tested code
-    #: use a loop object explicitely passed around.
+    #: use a loop object explicitly passed around.
     forbid_get_event_loop = False
 
     #: Event loop created and set as default event loop during the test.
@@ -497,7 +497,7 @@ def ignore_loop(func=None):
     """
     Ignore the error case where the loop did not run during the test.
     """
-    warnings.warn("ignore_loop() is deprected in favor of "
+    warnings.warn("ignore_loop() is deprecated in favor of "
                   "fail_on(unused_loop=False)", DeprecationWarning)
     checker = asynctest._fail_on._fail_on({"unused_loop": False})
     return checker if func is None else checker(func)

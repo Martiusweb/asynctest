@@ -62,7 +62,7 @@ class _fail_on:
         return _fail_on(self.checks.copy())
 
     def get_checks(self, case):
-        # cache the result so it's consistent accross calls to get_checks()
+        # cache the result so it's consistent across calls to get_checks()
         if self._computed_checks is None:
             checks = DEFAULTS.copy()
 
