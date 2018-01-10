@@ -328,11 +328,9 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
     def test_awaited_CoroutineMock_sets_awaited(self):
         mock = asynctest.mock.CoroutineMock()
         yield from mock()
-        mock.assert_awaited()
         self.assertTrue(mock.awaited)
 
         mock.reset_mock()
-        mock.assert_not_awaited()
         self.assertFalse(mock.awaited)
 
         @asyncio.coroutine
@@ -343,8 +341,6 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
         with self.assertRaises(RuntimeError):
             yield from mock()
-
-        mock.assert_awaited()
 
     @asyncio.coroutine
     def test_awaited_CoroutineMock_counts(self):
@@ -370,13 +366,11 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
     @asyncio.coroutine
     def test_awaited_from_autospec_mock(self):
         mock = asynctest.mock.create_autospec(Test)
-        mock.a_coroutine.assert_not_awaited()
         self.assertFalse(mock.a_coroutine.awaited)
         self.assertEqual(0, mock.a_coroutine.await_count)
 
         yield from mock.a_coroutine()
 
-        mock.a_coroutine.assert_awaited()
         self.assertTrue(mock.a_coroutine.awaited)
         self.assertEqual(1, mock.a_coroutine.await_count)
 
@@ -413,6 +407,165 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         self.assertFalse(t.done())
         yield from mock()
         yield from t
+
+    @asyncio.coroutine
+    def test_await_args(self):
+        with self.subTest('in order'):
+            mock = asynctest.mock.CoroutineMock()
+            t1 = mock('foo')
+            t2 = mock('bar')
+            yield from t1
+            yield from t2
+            self.assertEqual(mock.await_args, asynctest.call('bar'))
+
+        with self.subTest('out of order'):
+            mock = asynctest.mock.CoroutineMock()
+            t1 = mock('foo')
+            t2 = mock('bar')
+            yield from t2
+            yield from t1
+            self.assertEqual(mock.await_args, asynctest.call('foo'))
+
+    @asyncio.coroutine
+    def test_await_args_list(self):
+        with self.subTest('in order'):
+            mock = asynctest.mock.CoroutineMock()
+            t1 = mock('foo')
+            t2 = mock('bar')
+            yield from t1
+            yield from t2
+            self.assertEqual(mock.await_args_list, [asynctest.call('foo'), asynctest.call('bar')])
+
+        with self.subTest('out of order'):
+            mock = asynctest.mock.CoroutineMock()
+            t1 = mock('foo')
+            t2 = mock('bar')
+            yield from t2
+            yield from t1
+            self.assertEqual(mock.await_args_list, [asynctest.call('bar'), asynctest.call('foo')])
+
+    @asyncio.coroutine
+    def test_assert_awaited(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited()
+
+        yield from mock()
+        mock.assert_awaited()
+
+    @asyncio.coroutine
+    def test_assert_awaited_once(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_once()
+
+        yield from mock()
+        mock.assert_awaited_once()
+
+        yield from mock()
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_once()
+
+    @asyncio.coroutine
+    def test_assert_awaited_with(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_with('foo')
+
+        yield from mock('foo')
+        mock.assert_awaited_with('foo')
+
+        yield from mock('bar')
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_with('foo')
+
+    @asyncio.coroutine
+    def test_assert_awaited_once_with(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_once_with('foo')
+
+        yield from mock('foo')
+        mock.assert_awaited_once_with('foo')
+
+        yield from mock('foo')
+        with self.assertRaises(AssertionError):
+            mock.assert_awaited_once_with('foo')
+
+    @asyncio.coroutine
+    def test_assert_any_wait(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        with self.assertRaises(AssertionError):
+            mock.assert_any_await('bar')
+
+        yield from mock('foo')
+        with self.assertRaises(AssertionError):
+            mock.assert_any_await('bar')
+
+        yield from mock('bar')
+        mock.assert_any_await('bar')
+
+        yield from mock('baz')
+        mock.assert_any_await('bar')
+
+    @asyncio.coroutine
+    def test_assert_has_awaits(self):
+        calls = [asynctest.call('bar'), asynctest.call('baz')]
+
+        with self.subTest('any_order=False'):
+            mock = asynctest.mock.CoroutineMock()
+
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls)
+
+            yield from mock('foo')
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls)
+
+            yield from mock('bar')
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls)
+
+            yield from mock('baz')
+            mock.assert_has_awaits(calls)
+
+            yield from mock('qux')
+            mock.assert_has_awaits(calls)
+
+        with self.subTest('any_order=True'):
+            mock = asynctest.mock.CoroutineMock()
+
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls, any_order=True)
+
+            yield from mock('baz')
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls, any_order=True)
+
+            yield from mock('foo')
+            with self.assertRaises(AssertionError):
+                mock.assert_has_awaits(calls, any_order=True)
+
+            yield from mock('bar')
+            mock.assert_has_awaits(calls, any_order=True)
+
+            yield from mock('qux')
+            mock.assert_has_awaits(calls, any_order=True)
+
+    @asyncio.coroutine
+    def test_assert_not_awaited(self):
+        mock = asynctest.mock.CoroutineMock()
+
+        mock.assert_not_awaited()
+
+        yield from mock()
+        with self.assertRaises(AssertionError):
+            mock.assert_not_awaited()
 
 
 class TestMockInheritanceModel(unittest.TestCase):
