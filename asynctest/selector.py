@@ -325,11 +325,19 @@ def get_registered_events(selector):
     return set(watched_events)
 
 
-def _format_callback(handle):
-    if hasattr(asyncio.events, "_format_args_and_kwargs"):
+if hasattr(asyncio, "format_helpers"):
+    # Python 3.7+
+    def _format_callback(handle):
+        return asyncio.format_helpers._format_callback(handle._callback,
+                                                       handle._args, None)
+elif hasattr(asyncio.events, "_format_args_and_kwargs"):
+    # Python 3.5, 3.6
+    def _format_callback(handle):
         return asyncio.events._format_callback(handle._callback, handle._args,
                                                None)
-    else:
+else:
+    # Python 3.4
+    def _format_callback(handle):
         return asyncio.events._format_callback(handle._callback, handle._args)
 
 
