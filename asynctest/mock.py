@@ -405,8 +405,9 @@ class _AwaitEvent:
         """
         Wait for the next await.
 
-        Unlike :meth:`wait` that counts any await, mock has to be awaited once more,
-        disregarding to the current :attr:`asynctest.CoroutineMock.await_count`.
+        Unlike :meth:`wait` that counts any await, mock has to be awaited once
+        more, disregarding to the current
+        :attr:`asynctest.CoroutineMock.await_count`.
 
         :param skip: How many awaits will be skipped.
                      As a result, the mock should be awaited at least
@@ -428,39 +429,42 @@ class _AwaitEvent:
                           will be interpreted as a boolean value.
                           The final predicate value is the return value.
         """
-        c = self._get_condition()
+        condition = self._get_condition()
 
         try:
-            yield from c.acquire()
+            yield from condition.acquire()
 
             def _predicate():
                 return predicate(self._mock)
 
-            return (yield from c.wait_for(_predicate))
+            return (yield from condition.wait_for(_predicate))
         finally:
-            c.release()
+            condition.release()
 
     @asyncio.coroutine
     def _notify(self):
-        c = self._get_condition()
+        condition = self._get_condition()
 
         try:
-            yield from c.acquire()
-            c.notify_all()
+            yield from condition.acquire()
+            condition.notify_all()
         finally:
-            c.release()
+            condition.release()
 
     def _get_condition(self):
         """
-        Creation of condition is delayed, to minimize the change of using the wrong loop.
+        Creation of condition is delayed, to minimize the change of using the
+        wrong loop.
 
-        A user may create a mock with _AwaitEvent before selecting the execution loop.
-        Requiring a user to delay creation is error-prone and inflexible. Instead, condition
-        is created when user actually starts to use the mock.
+        A user may create a mock with _AwaitEvent before selecting the
+        execution loop.  Requiring a user to delay creation is error-prone and
+        inflexible. Instead, condition is created when user actually starts to
+        use the mock.
         """
         # No synchronization is needed:
         #   - asyncio is thread unsafe
-        #   - there are no awaits here, method will be executed without switching asyncio context.
+        #   - there are no awaits here, method will be executed without
+        #   switching asyncio context.
         if self._condition is None:
             self._condition = asyncio.Condition()
 
@@ -508,13 +512,12 @@ class CoroutineMock(Mock):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
     """
-    #: Property which is set when the mock is awaited. Its ``wait``,
-    #: ``wait_next`` and ``wait_for`` coroutine methods can be used
-    #: to synchronize execution.
+    #: Property which is set when the mock is awaited. Its ``wait`` and
+    #: ``wait_next`` coroutine methods can be used to synchronize execution.
     #:
     #: .. versionadded:: 0.12
     awaited = unittest.mock._delegating_property('awaited')
-    #: Number of times the mock has been awaited (or "yielded from").
+    #: Number of times the mock has been awaited.
     #:
     #: .. versionadded:: 0.12
     await_count = unittest.mock._delegating_property('await_count')
