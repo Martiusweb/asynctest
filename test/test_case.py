@@ -53,7 +53,7 @@ class Test:
             try:
                 out, err = yield from asyncio.wait_for(
                     process.communicate(), timeout=.1, loop=loop)
-            except:
+            except BaseException:
                 process.kill()
                 os.waitpid(process.pid, os.WNOHANG)
                 raise
@@ -725,16 +725,20 @@ class Test_fail_on(_TestCase):
     "asynctest._fail_on.DEFAULTS", clear=True,
     unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'])
 class Test_fail_on_unused_loop(_TestCase):
+    @asynctest.fail_on(unused_loop=True)
+    class WithCheckTestCase(Test.FooTestCase):
+        pass
+
     def test_fails_when_loop_didnt_run(self):
         with self.assertRaisesRegex(AssertionError,
                                     'Loop did not run during the test'):
-            Test.FooTestCase().debug()
+            self.WithCheckTestCase().debug()
 
-        result = Test.FooTestCase().run()
+        result = self.WithCheckTestCase().run()
         self.assertEqual(1, len(result.failures))
 
     def test_fails_when_loop_didnt_run_using_default_loop(self):
-        class TestCase(Test.FooTestCase):
+        class TestCase(self.WithCheckTestCase):
             use_default_loop = True
 
         default_loop = self.create_default_loop()
@@ -762,11 +766,13 @@ class Test_fail_on_unused_loop(_TestCase):
         class IgnoreLoopClassTest(Test.FooTestCase):
             pass
 
+        @asynctest.fail_on(unused_loop=True)
         class WithCoroutineTest(asynctest.TestCase):
             @asyncio.coroutine
             def runTest(self):
                 yield from []
 
+        @asynctest.fail_on(unused_loop=True)
         class WithFunctionCallingLoopTest(asynctest.TestCase):
             def runTest(self):
                 fut = asyncio.Future()
@@ -787,7 +793,7 @@ class Test_fail_on_unused_loop(_TestCase):
                 if test_use_default_loop:
                     self.create_default_loop()
 
-                class TestCase(Test.FooTestCase):
+                class TestCase(self.WithCheckTestCase):
                     use_default_loop = test_use_default_loop
 
                     def setUp(self):
@@ -807,7 +813,7 @@ class Test_fail_on_unused_loop(_TestCase):
                 if test_use_default_loop:
                     self.create_default_loop()
 
-                class TestCase(Test.FooTestCase):
+                class TestCase(self.WithCheckTestCase):
                     use_default_loop = test_use_default_loop
 
                     def setUp(self):

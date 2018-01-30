@@ -30,7 +30,7 @@ _FAIL_ON_ATTR = "_asynctest_fail_on"
 #: the name of the static method performing the check in the :class:`_fail_on`.
 #: The value is True when the check is enabled by default, False otherwise.
 DEFAULTS = {
-    "unused_loop": True,
+    "unused_loop": False,
     "active_handles": False,
 }
 
