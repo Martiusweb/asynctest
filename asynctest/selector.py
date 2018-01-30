@@ -68,7 +68,7 @@ def fd(fileobj):
 
     Note that if fileobj is an int, :exc:`ValueError` is raised.
 
-    :raise ValueError: if filobj is not a :class:`~asynctest.FileMock`,
+    :raise ValueError: if ``fileobj`` is not a :class:`~asynctest.FileMock`,
                        a file-like object or
                        a :class:`~asynctest.FileDescriptor`.
     """
@@ -102,7 +102,7 @@ class FileMock(mock.Mock):
 
         Return a :class:`~asynctest.FileDescriptor` object.
     """
-    def __init__(self, *args, parent=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.fileno.return_value = FileDescriptor()
@@ -178,7 +178,7 @@ def set_read_ready(fileobj, loop):
 
     .. versionadded:: 0.4
     """
-    # since the selector whould notify of events at the begining of the next
+    # since the selector would notify of events at the beginning of the next
     # iteration, we let this iteration finish before actually scheduling the
     # reader (hence the call_soon)
     loop.call_soon_threadsafe(_set_event_ready, fileobj, loop, selectors.EVENT_READ)
@@ -189,7 +189,7 @@ def set_write_ready(fileobj, loop):
     Schedule callbacks registered on ``loop`` as if the selector notified that
     data can be written to ``fileobj``.
 
-    :param fileobj: file obkect or  :class:`~asynctest.FileMock` on which th
+    :param fileobj: file object or  :class:`~asynctest.FileMock` on which th
         event is mocked.
     :param loop: :class:`asyncio.SelectorEventLoop` watching for events on
         ``fileobj``.
@@ -287,7 +287,7 @@ class TestSelector(selectors._BaseSelectorImpl):
 
     def select(self, timeout=None):
         """
-        Perfom the selection.
+        Perform the selection.
 
         This method is a no-op if no actual selector has been supplied.
 
@@ -355,13 +355,11 @@ def _format_event(event):
     return callbacks
 
 
-@staticmethod
 def fail_on_before_test_active_selector_callbacks(case):
     case._active_selector_callbacks = get_registered_events(
         case.loop._selector)
 
 
-@staticmethod
 def fail_on_active_selector_callbacks(case):
     ignored_events = case._active_selector_callbacks
     active_events = get_registered_events(case.loop._selector)
@@ -375,6 +373,6 @@ def fail_on_active_selector_callbacks(case):
 
 
 _fail_on.DEFAULTS["active_selector_callbacks"] = False
-_fail_on._fail_on.active_selector_callbacks = fail_on_active_selector_callbacks
+_fail_on._fail_on.active_selector_callbacks = staticmethod(fail_on_active_selector_callbacks)
 _fail_on._fail_on.before_test_active_selector_callbacks = \
-    fail_on_before_test_active_selector_callbacks
+    staticmethod(fail_on_before_test_active_selector_callbacks)
