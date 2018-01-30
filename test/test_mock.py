@@ -305,6 +305,116 @@ class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
         self.assertIsInstance(run_coroutine(mock()), asynctest.mock.MagicMock)
 
 
+class Test_CoroutineMock_awaited(asynctest.TestCase):
+    @asynctest.fail_on(unused_loop=False)
+    def test_awaited_delays_creation_of_condition(self):
+        mock = asynctest.mock.CoroutineMock()
+        self.assertIsNone(mock.awaited._condition)
+        mock()
+        self.assertIsNone(mock.awaited._condition)
+        run_coroutine(mock())
+        self.assertIsNotNone(mock.awaited._condition)
+
+        @asyncio.coroutine
+        def f():
+            yield from mock.awaited._condition.acquire()
+            yield from mock.awaited._condition.acquire()
+
+        # Condition belongs to a loop created by run_coroutine, not current loop.
+        with self.assertRaises(RuntimeError):
+            run_coroutine(f())
+
+    @asyncio.coroutine
+    def test_awaited_CoroutineMock_sets_awaited(self):
+        mock = asynctest.mock.CoroutineMock()
+        yield from mock()
+        mock.assert_awaited()
+        self.assertTrue(mock.awaited)
+
+        mock.reset_mock()
+        mock.assert_not_awaited()
+        self.assertFalse(mock.awaited)
+
+        @asyncio.coroutine
+        def side_effect():
+            raise RuntimeError()
+
+        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+
+        with self.assertRaises(RuntimeError):
+            yield from mock()
+
+        mock.assert_awaited()
+
+    @asyncio.coroutine
+    def test_awaited_CoroutineMock_counts(self):
+        mock = asynctest.mock.CoroutineMock()
+        yield from mock()
+        yield from mock()
+        self.assertEqual(mock.await_count, 2)
+
+        mock.reset_mock()
+        self.assertEqual(mock.await_count, 0)
+
+        @asyncio.coroutine
+        def side_effect():
+            raise RuntimeError()
+
+        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+
+        with self.assertRaises(RuntimeError):
+            yield from mock()
+
+        self.assertEqual(mock.await_count, 1)
+
+    @asyncio.coroutine
+    def test_awaited_from_autospec_mock(self):
+        mock = asynctest.mock.create_autospec(Test)
+        mock.a_coroutine.assert_not_awaited()
+        self.assertFalse(mock.a_coroutine.awaited)
+        self.assertEqual(0, mock.a_coroutine.await_count)
+
+        yield from mock.a_coroutine()
+
+        mock.a_coroutine.assert_awaited()
+        self.assertTrue(mock.a_coroutine.awaited)
+        self.assertEqual(1, mock.a_coroutine.await_count)
+
+    @asyncio.coroutine
+    def test_awaited_wait(self):
+        mock = asynctest.mock.CoroutineMock()
+        t = asyncio.ensure_future(mock.awaited.wait())
+        yield from mock()
+        yield from mock()
+        yield from t
+
+        mock.reset_mock()
+        t = asyncio.ensure_future(mock.awaited.wait(skip=1))
+        yield from mock()
+        self.assertFalse(t.done())
+        yield from mock()
+        yield from t
+
+    @asyncio.coroutine
+    def test_awaited_wait_next(self):
+        mock = asynctest.mock.CoroutineMock()
+        yield from mock()
+        t = asyncio.ensure_future(mock.awaited.wait_next())
+        yield from asyncio.sleep(0.01)
+        self.assertFalse(t.done())
+        yield from mock()
+        yield from t
+
+        mock.reset_mock()
+        yield from mock()
+        t = asyncio.ensure_future(mock.awaited.wait_next(skip=1))
+        yield from asyncio.sleep(0.01)
+        yield from mock()
+        self.assertFalse(t.done())
+        yield from mock()
+        yield from t
+
+
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
         'NonCallableMagicMock': 'NonCallableMock',
