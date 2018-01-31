@@ -518,6 +518,8 @@ class CoroutineMock(Mock):
     #:
     #: .. versionadded:: 0.12
     await_count = unittest.mock._delegating_property('await_count')
+    await_args = unittest.mock._delegating_property('await_args')
+    await_args_list = unittest.mock._delegating_property('await_args_list')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -529,27 +531,26 @@ class CoroutineMock(Mock):
         self.__dict__['_is_coroutine'] = _is_coroutine
         self.__dict__['_mock_awaited'] = _AwaitEvent(self)
         self.__dict__['_mock_await_count'] = 0
+        self.__dict__['_mock_await_args'] = None
+        self.__dict__['_mock_await_args_list'] = unittest.mock._CallList()
 
     def _mock_call(_mock_self, *args, **kwargs):
         try:
             result = super()._mock_call(*args, **kwargs)
+            _call = _mock_self.call_args
 
-            if _isawaitable(result):
-                @asyncio.coroutine
-                def proxy():
-                    try:
+            @asyncio.coroutine
+            def proxy():
+                try:
+                    if _isawaitable(result):
                         return (yield from result)
-                    finally:
-                        _mock_self.await_count += 1
-                        yield from _mock_self.awaited._notify()
-            else:
-                @asyncio.coroutine
-                def proxy():
-                    try:
+                    else:
                         return result
-                    finally:
-                        _mock_self.await_count += 1
-                        yield from _mock_self.awaited._notify()
+                finally:
+                    _mock_self.await_count += 1
+                    _mock_self.await_args = _call
+                    _mock_self.await_args_list.append(_call)
+                    yield from _mock_self.awaited._notify()
 
             return proxy()
         except StopIteration as e:
@@ -573,6 +574,107 @@ class CoroutineMock(Mock):
                    self._mock_name or 'mock')
             raise AssertionError(msg)
 
+    def assert_awaited_once(_mock_self, *args, **kwargs):
+        """
+        Assert that the mock was awaited exactly once.
+
+        .. versionadded:: 0.12
+        """
+        self = _mock_self
+        if not self.await_count == 1:
+            msg = ("Expected '%s' to have been awaited once. Awaited %s times." %
+                   (self._mock_name or 'mock', self.await_count))
+            raise AssertionError(msg)
+
+    def assert_awaited_with(_mock_self, *args, **kwargs):
+        """
+        Assert that the last await was with the specified arguments.
+
+        .. versionadded:: 0.12
+        """
+        self = _mock_self
+        if self.await_args is None:
+            expected = self._format_mock_call_signature(args, kwargs)
+            raise AssertionError('Expected await: %s\nNot awaited' % (expected,))
+
+        def _error_message():
+            msg = self._format_mock_failure_message(args, kwargs)
+            return msg
+
+        expected = self._call_matcher((args, kwargs))
+        actual = self._call_matcher(self.await_args)
+        if expected != actual:
+            cause = expected if isinstance(expected, Exception) else None
+            raise AssertionError(_error_message()) from cause
+
+    def assert_awaited_once_with(_mock_self, *args, **kwargs):
+        """
+        Assert that the mock was awaited exactly once and with the specified arguments.
+
+        .. versionadded:: 0.12
+        """
+        self = _mock_self
+        if not self.await_count == 1:
+            msg = ("Expected '%s' to be awaited once. Awaited %s times." %
+                   (self._mock_name or 'mock', self.await_count))
+            raise AssertionError(msg)
+        return self.assert_awaited_with(*args, **kwargs)
+
+    def assert_any_await(_mock_self, *args, **kwargs):
+        """
+        Assert the mock has ever been awaited with the specified arguments.
+
+        .. versionadded:: 0.12
+        """
+        self = _mock_self
+        expected = self._call_matcher((args, kwargs))
+        actual = [self._call_matcher(c) for c in self.await_args_list]
+        if expected not in actual:
+            cause = expected if isinstance(expected, Exception) else None
+            expected_string = self._format_mock_call_signature(args, kwargs)
+            raise AssertionError(
+                '%s await not found' % expected_string
+            ) from cause
+
+    def assert_has_awaits(_mock_self, calls, any_order=False):
+        """
+        Assert the mock has been awaited with the specified calls.
+        The :attr:`await_args_list` list is checked for the awaits.
+
+        If `any_order` is False (the default) then the awaits must be
+        sequential. There can be extra calls before or after the
+        specified awaits.
+
+        If `any_order` is True then the awaits can be in any order, but
+        they must all appear in :attr:`await_args_list`.
+
+        .. versionadded:: 0.12
+        """
+        self = _mock_self
+        expected = [self._call_matcher(c) for c in calls]
+        cause = expected if isinstance(expected, Exception) else None
+        all_awaits = unittest.mock._CallList(self._call_matcher(c) for c in self.await_args_list)
+        if not any_order:
+            if expected not in all_awaits:
+                raise AssertionError(
+                    'Awaits not found.\nExpected: %r\n'
+                    'Actual: %r' % (unittest.mock._CallList(calls), self.await_args_list)
+                ) from cause
+            return
+
+        all_awaits = list(all_awaits)
+
+        not_found = []
+        for kall in expected:
+            try:
+                all_awaits.remove(kall)
+            except ValueError:
+                not_found.append(kall)
+        if not_found:
+            raise AssertionError(
+                '%r not all found in await list' % (tuple(not_found),)
+            ) from cause
+
     def assert_not_awaited(_mock_self):
         """
         Assert that the mock was never awaited.
@@ -592,6 +694,8 @@ class CoroutineMock(Mock):
         super().reset_mock(*args, **kwargs)
         self.awaited = _AwaitEvent(self)
         self.await_count = 0
+        self.await_args = None
+        self.await_args_list = unittest.mock._CallList()
 
 
 def create_autospec(spec, spec_set=False, instance=False, _parent=None,
@@ -661,15 +765,19 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             mock._is_coroutine = _is_coroutine
             mock.awaited = _AwaitEvent(mock)
             mock.await_count = 0
+            mock.await_args = None
+            mock.await_args_list = unittest.mock._CallList()
 
-            def assert_awaited(*args, **kwargs):
-                return wrapped_mock.assert_awaited(*args, **kwargs)
-
-            def assert_not_awaited(*args, **kwargs):
-                return wrapped_mock.assert_not_awaited(*args, **kwargs)
-
-            mock.assert_awaited = assert_awaited
-            mock.assert_not_awaited = assert_not_awaited
+            for a in ('assert_awaited',
+                      'assert_awaited_once',
+                      'assert_awaited_with',
+                      'assert_awaited_once_with',
+                      'assert_any_await',
+                      'assert_has_awaits',
+                      'assert_not_awaited'):
+                def f(*args, **kwargs):
+                    return getattr(wrapped_mock, a)(*args, **kwargs)
+                setattr(mock, a, f)
     else:
         unittest.mock._check_signature(spec, mock, is_type, instance)
 
