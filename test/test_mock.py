@@ -33,6 +33,10 @@ class Test:
     a_dict = {'is_patched': False, 'second_is_patched': False}
     a_second_dict = {'is_patched': False}
 
+    @asyncio.coroutine
+    def a_coroutine_with_args(self, arg, arg2):
+        return None
+
 
 class ProbeException(Exception):
     pass
@@ -907,6 +911,110 @@ class Test_patch_dict(unittest.TestCase):
         self.assertTrue(run_coroutine(instance.test_a_coroutine()))
         self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
 
+
+class Test_patch_autospec(unittest.TestCase):
+    test_class_path = "{}.Test".format(__name__)
+
+    def test_autospec_coroutine(self):
+        called = False
+
+        @asynctest.mock.patch(self.test_class_path, autospec=True)
+        def patched(mock):
+            nonlocal called
+            called = True
+            self.assertIsInstance(mock.a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
+            self.assertIsInstance(mock().a_coroutine,
+                                  asynctest.mock.CoroutineMock)
+
+            self.assertIsInstance(mock.a_function, asynctest.mock.Mock)
+            self.assertIsInstance(mock().a_function, asynctest.mock.Mock)
+
+            if _using_await:
+                self.assertIsInstance(mock.an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock().an_async_coroutine,
+                                      asynctest.mock.CoroutineMock)
+
+        patched()
+        self.assertTrue(called)
+
+    def test_patch_autospec_with_patches_on_top(self):
+        called = False
+
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "is_patched"),
+                              return_value=True)
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "a_coroutine"),
+                              autospec=True)
+        def patched_function(coroutine_mock, is_patched_mock):
+            nonlocal called
+            called = True
+
+            self.assertIsInstance(Test.is_patched, asynctest.mock.Mock)
+            self.assertTrue(Test.is_patched())
+            self.assertTrue(asyncio.iscoroutinefunction(coroutine_mock))
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine))
+
+        patched_function()
+        self.assertTrue(called)
+
+    def test_patch_autospec_with_patches_under(self):
+        called = False
+
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "a_coroutine"),
+                              autospec=True)
+        @asynctest.mock.patch("{}.{}".format(self.test_class_path, "is_patched"),
+                              return_value=True)
+        def patched_function(is_patched_mock, coroutine_mock):
+            nonlocal called
+            called = True
+
+            self.assertIsInstance(Test.is_patched, asynctest.mock.Mock)
+            self.assertTrue(Test.is_patched())
+            self.assertTrue(asyncio.iscoroutinefunction(coroutine_mock))
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine))
+
+        patched_function()
+        self.assertTrue(called)
+
+    def test_patch_object_autospec(self):
+        called = False
+
+        @asynctest.mock.patch.object(Test, "a_coroutine_with_args", autospec=True)
+        def patched_function(patched):
+            nonlocal called
+            called = True
+
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine_with_args))
+            with self.assertRaisesRegex(TypeError, "arg2"):
+                run_coroutine(Test().a_coroutine_with_args("arg"))
+
+            self.assertTrue(run_coroutine(Test().a_coroutine_with_args("arg", "arg2")))
+
+        patched_function()
+        self.assertTrue(called)
+
+    def test_patch_multiple_autospec(self):
+        called = False
+        default = asynctest.mock.DEFAULT
+
+        @asynctest.mock.patch.multiple(Test, autospec=True,
+                                       a_coroutine=default,
+                                       a_coroutine_with_args=default)
+        def patched_function(**patched):
+            nonlocal called
+            called = True
+
+            with self.assertRaisesRegex(TypeError, "arg2"):
+                run_coroutine(Test().a_coroutine_with_args("arg"))
+
+            test = Test()
+            self.assertTrue(run_coroutine(test.a_coroutine()))
+            self.assertTrue(run_coroutine(test.a_coroutine_with_args("arg", "arg2")))
+
+        patched_function()
+        self.assertTrue(called)
 
 #
 # patch scopes
