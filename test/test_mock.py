@@ -33,6 +33,10 @@ class Test:
     a_dict = {'is_patched': False, 'second_is_patched': False}
     a_second_dict = {'is_patched': False}
 
+    @asyncio.coroutine
+    def a_coroutine_with_args(self, arg, arg2):
+        return None
+
 
 class ProbeException(Exception):
     pass
@@ -974,6 +978,43 @@ class Test_patch_autospec(unittest.TestCase):
         patched_function()
         self.assertTrue(called)
 
+    def test_patch_object_autospec(self):
+        called = False
+
+        @asynctest.mock.patch.object(Test, "a_coroutine_with_args", autospec=True)
+        def patched_function(patched):
+            nonlocal called
+            called = True
+
+            self.assertTrue(asyncio.iscoroutinefunction(Test.a_coroutine_with_args))
+            with self.assertRaisesRegex(TypeError, "arg2"):
+                run_coroutine(Test().a_coroutine_with_args("arg"))
+
+            self.assertTrue(run_coroutine(Test().a_coroutine_with_args("arg", "arg2")))
+
+        patched_function()
+        self.assertTrue(called)
+
+    def test_patch_multiple_autospec(self):
+        called = False
+        default = asynctest.mock.DEFAULT
+
+        @asynctest.mock.patch.multiple(Test, autospec=True,
+                                       a_coroutine=default,
+                                       a_coroutine_with_args=default)
+        def patched_function(**patched):
+            nonlocal called
+            called = True
+
+            with self.assertRaisesRegex(TypeError, "arg2"):
+                run_coroutine(Test().a_coroutine_with_args("arg"))
+
+            test = Test()
+            self.assertTrue(run_coroutine(test.a_coroutine()))
+            self.assertTrue(run_coroutine(test.a_coroutine_with_args("arg", "arg2")))
+
+        patched_function()
+        self.assertTrue(called)
 
 #
 # patch scopes
