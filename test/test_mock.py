@@ -367,6 +367,14 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
         self.assertEqual(mock.await_count, 1)
 
+        mock.reset_mock()
+        mock.side_effect = RuntimeError
+
+        with self.assertRaises(RuntimeError):
+            yield from mock()
+
+        self.assertEqual(mock.await_count, 1)
+
     @asyncio.coroutine
     def test_awaited_from_autospec_mock(self):
         mock = asynctest.mock.create_autospec(Test)
