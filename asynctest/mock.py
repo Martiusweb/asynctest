@@ -540,30 +540,31 @@ class CoroutineMock(Mock):
     def _mock_call(_mock_self, *args, **kwargs):
         try:
             result = super()._mock_call(*args, **kwargs)
-            _call = _mock_self.call_args
-
-            @asyncio.coroutine
-            def proxy():
-                try:
-                    if _isawaitable(result):
-                        return (yield from result)
-                    else:
-                        return result
-                finally:
-                    _mock_self.await_count += 1
-                    _mock_self.await_args = _call
-                    _mock_self.await_args_list.append(_call)
-                    yield from _mock_self.awaited._notify()
-
-            return proxy()
         except StopIteration as e:
             side_effect = _mock_self.side_effect
             if side_effect is not None and not callable(side_effect):
                 raise
 
-            return asyncio.coroutine(_raise)(e)
+            result = asyncio.coroutine(_raise)(e)
         except BaseException as e:
-            return asyncio.coroutine(_raise)(e)
+            result = asyncio.coroutine(_raise)(e)
+
+        _call = _mock_self.call_args
+
+        @asyncio.coroutine
+        def proxy():
+            try:
+                if _isawaitable(result):
+                    return (yield from result)
+                else:
+                    return result
+            finally:
+                _mock_self.await_count += 1
+                _mock_self.await_args = _call
+                _mock_self.await_args_list.append(_call)
+                yield from _mock_self.awaited._notify()
+
+        return proxy()
 
     def assert_awaited(_mock_self):
         """
