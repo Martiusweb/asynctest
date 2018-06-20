@@ -856,7 +856,13 @@ DEFAULT = unittest.mock.sentinel.DEFAULT
 
 def _update_new_callable(patcher, new, new_callable):
     if new == DEFAULT and not new_callable:
-        if asyncio.iscoroutinefunction(patcher.get_original()[0]):
+        original = patcher.get_original()[0]
+        if isinstance(original, (classmethod, staticmethod)):
+            # the original object is the raw descriptor, if it's a classmethod
+            # or a static method, we need to unwrap it
+            original = original.__get__(None, object)
+
+        if asyncio.iscoroutinefunction(original):
             patcher.new_callable = CoroutineMock
         else:
             patcher.new_callable = MagicMock

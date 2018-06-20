@@ -14,6 +14,14 @@ def patch_Test_Class(klass):
         async def an_async_coroutine(self):
             pass
 
+        @classmethod
+        async def an_async_classmethod_coroutine(self):
+            pass
+
+        @staticmethod
+        async def an_async_staticmethod_coroutine(self):
+            pass
+
     return Test
 
 
