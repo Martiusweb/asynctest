@@ -3,6 +3,7 @@
 import asyncio
 import functools
 import inspect
+import platform
 import unittest
 import sys
 
@@ -1209,6 +1210,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             yield self.is_patched()
 
         gen = a_generator()
+        self.addCleanup(gen.close)
         self.assertTrue(next(gen))
         self.assertTrue(self.is_patched())
         self.assertTrue(next(gen))
@@ -1220,12 +1222,13 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             yield self.is_patched()
 
         gen = a_generator()
+        self.addCleanup(gen.close)
         self.assertTrue(next(gen))
         self.assertFalse(self.is_patched())
         self.assertTrue(next(gen))
 
     def test_patch_generator_with_multiple_scopes(self):
-        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("Outer: GLOBAL, inner: LIMITED"):
             @patch_dict_is_patched(scope=asynctest.GLOBAL)
             @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
             def a_generator():
@@ -1233,13 +1236,16 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
                 yield (self.is_patched(), self.second_dict_is_patched())
 
             gen = a_generator()
-            self.assertEqual((True, True), next(gen))
-            self.assertEqual(
-                (True, False),
-                (self.is_patched(), self.second_dict_is_patched()))
-            self.assertEqual((True, True), next(gen))
+            try:
+                self.assertEqual((True, True), next(gen))
+                self.assertEqual(
+                    (True, False),
+                    (self.is_patched(), self.second_dict_is_patched()))
+                self.assertEqual((True, True), next(gen))
+            finally:
+                gen.close()
 
-        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("Outer: LIMITED, inner: GLOBAL"):
             @patch_dict_is_patched(scope=asynctest.LIMITED)
             @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
             def a_generator():
@@ -1247,11 +1253,14 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
                 yield (self.is_patched(), self.second_dict_is_patched())
 
             gen = a_generator()
-            self.assertEqual((True, True), next(gen))
-            self.assertEqual(
-                (False, True),
-                (self.is_patched(), self.second_dict_is_patched()))
-            self.assertEqual((True, True), next(gen))
+            try:
+                self.assertEqual((True, True), next(gen))
+                self.assertEqual(
+                    (False, True),
+                    (self.is_patched(), self.second_dict_is_patched()))
+                self.assertEqual((True, True), next(gen))
+            finally:
+                gen.close()
 
     def test_patch_generator_with_multiple_scopes_on_same_dict(self):
         import test.test_mock
@@ -1263,31 +1272,37 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
                     self.is_patched(), self.second_is_patched(),
                     test.test_mock.Test.a_dict.get('overriden_value', False))
 
-        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("Outer: GLOBAL, inner: LIMITED"):
             @patch_dict_is_patched(scope=asynctest.GLOBAL)
             @patch_dict_second_is_patched(scope=asynctest.LIMITED)
             def a_generator():
                 yield from tester()
 
             gen = a_generator()
-            self.assertEqual((True, True, True), next(gen))
-            self.assertEqual((True, False),
-                             (self.is_patched(), self.second_is_patched()))
-            self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
-            self.assertEqual((True, True, True), next(gen))
+            try:
+                self.assertEqual((True, True, True), next(gen))
+                self.assertEqual((True, False),
+                                 (self.is_patched(), self.second_is_patched()))
+                self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
+                self.assertEqual((True, True, True), next(gen))
+            finally:
+                gen.close()
 
-        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("Outer: LIMITED, inner: GLOBAL"):
             @patch_dict_is_patched(scope=asynctest.LIMITED)
             @patch_dict_second_is_patched(scope=asynctest.GLOBAL)
             def a_generator():
                 yield from tester()
 
             gen = a_generator()
-            self.assertEqual((True, True, True), next(gen))
-            self.assertEqual((False, True),
-                             (self.is_patched(), self.second_is_patched()))
-            self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
-            self.assertEqual((True, True, True), next(gen))
+            try:
+                self.assertEqual((True, True, True), next(gen))
+                self.assertEqual((False, True),
+                                 (self.is_patched(), self.second_is_patched()))
+                self.assertNotIn('overriden_value', test.test_mock.Test.a_dict)
+                self.assertEqual((True, True, True), next(gen))
+            finally:
+                gen.close()
 
     def test_patch_coroutine_with_multiple_scopes(self):
         def tester():
@@ -1314,7 +1329,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
 
             return before, future.result(), after
 
-        with self.subTest("old style coroutine - Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("old style coroutine - Outer: GLOBAL, inner: LIMITED"):
             @patch_dict_is_patched(scope=asynctest.GLOBAL)
             @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
             @asyncio.coroutine
@@ -1326,7 +1341,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             self.assertEqual((True, False), between)
             self.assertEqual((True, True), after)
 
-        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("old style coroutine - Outer: LIMITED, inner: GLOBAL"):
             @patch_dict_is_patched(scope=asynctest.LIMITED)
             @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
             @asyncio.coroutine
@@ -1343,7 +1358,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
 
         tester_coroutine = _using_await.build_simple_coroutine(tester)
 
-        with self.subTest("new style coroutine - Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("new style coroutine - Outer: GLOBAL, inner: LIMITED"):
             a_coroutine = patch_dict_is_patched(scope=asynctest.GLOBAL)(
                 patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)(
                     tester_coroutine))
@@ -1353,7 +1368,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             self.assertEqual((True, False), between)
             self.assertEqual((True, True), after)
 
-        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("old style coroutine - Outer: LIMITED, inner: GLOBAL"):
             a_coroutine = patch_dict_is_patched(scope=asynctest.LIMITED)(
                 patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)(
                     tester_coroutine))
@@ -1433,6 +1448,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
             yield self.is_patched()
 
         gen = a_generator()
+        self.addCleanup(gen.close)
         self.assertTrue(next(gen))
         self.assertTrue(self.is_patched())
         self.assertTrue(next(gen))
@@ -1442,29 +1458,35 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
             yield (self.is_patched(), self.second_is_patched())
             yield (self.is_patched(), self.second_is_patched())
 
-        with self.subTest("Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("Outer: GLOBAL, inner: LIMITED"):
             @patch_is_patched(scope=asynctest.GLOBAL)
             @patch_second_is_patched(scope=asynctest.LIMITED)
             def patched():
                 yield from a_generator()
 
             gen = patched()
-            self.assertEqual((True, True), next(gen))
-            self.assertTrue(self.is_patched())
-            self.assertFalse(self.second_is_patched())
-            self.assertEqual((True, True), next(gen))
+            try:
+                self.assertEqual((True, True), next(gen))
+                self.assertTrue(self.is_patched())
+                self.assertFalse(self.second_is_patched())
+                self.assertEqual((True, True), next(gen))
+            finally:
+                gen.close()
 
-        with self.subTest("Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("Outer: LIMITED, inner: GLOBAL"):
             @patch_second_is_patched(scope=asynctest.LIMITED)
             @patch_is_patched(scope=asynctest.GLOBAL)
             def patched():
                 yield from a_generator()
 
             gen = patched()
-            self.assertEqual((True, True), next(gen))
-            self.assertTrue(self.is_patched())
-            self.assertFalse(self.second_is_patched())
-            self.assertEqual((True, True), next(gen))
+            try:
+                self.assertEqual((True, True), next(gen))
+                self.assertTrue(self.is_patched())
+                self.assertFalse(self.second_is_patched())
+                self.assertEqual((True, True), next(gen))
+            finally:
+                gen.close()
 
     def test_patch_coroutine_with_multiple_scopes(self):
         def set_fut_result(fut):
@@ -1482,7 +1504,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
             self.assertFalse(self.is_patched())
             self.assertFalse(self.second_is_patched())
 
-        with self.subTest("old style coroutine - Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("old style coroutine - Outer: GLOBAL, inner: LIMITED"):
             @patch_is_patched(scope=asynctest.GLOBAL)
             @patch_second_is_patched(scope=asynctest.LIMITED)
             def a_coroutine(fut):
@@ -1493,7 +1515,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
 
             run_coroutine(tester(a_coroutine))
 
-        with self.subTest("old style coroutine - Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("old style coroutine - Outer: LIMITED, inner: GLOBAL"):
             @patch_second_is_patched(scope=asynctest.LIMITED)
             @patch_is_patched(scope=asynctest.GLOBAL)
             def a_coroutine(fut):
@@ -1507,7 +1529,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
         if not _using_await:
             return
 
-        with self.subTest("new style coroutine - Outher: GLOBAL, inner: LIMITED"):
+        with self.subTest("new style coroutine - Outer: GLOBAL, inner: LIMITED"):
             a_new_style_coroutine = _using_await.build_simple_coroutine(
                 lambda: (self.is_patched(), self.second_is_patched()))
             a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
@@ -1516,7 +1538,7 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
                 a_new_style_coroutine)
             run_coroutine(tester(a_new_style_coroutine))
 
-        with self.subTest("new style coroutine - Outher: LIMITED, inner: GLOBAL"):
+        with self.subTest("new style coroutine - Outer: LIMITED, inner: GLOBAL"):
             a_new_style_coroutine = _using_await.build_simple_coroutine(
                 lambda: (self.is_patched(), self.second_is_patched()))
             a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
@@ -1550,6 +1572,30 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
             self.fail("Coroutine must be stopped")
         except StopIteration:
             pass
+        self.assertFalse(self.is_patched())
+
+    def test_patch_generator_during_its_close(self):
+        when_generator_closes = (False, False)
+
+        @patch_second_is_patched(scope=asynctest.LIMITED)
+        @patch_is_patched(scope=asynctest.GLOBAL)
+        def a_generator():
+            try:
+                while True:
+                    yield (self.is_patched(), self.second_is_patched())
+            except GeneratorExit:
+                nonlocal when_generator_closes
+                when_generator_closes = (self.is_patched(),
+                                         self.second_is_patched())
+                raise
+
+        gen = a_generator()
+        self.assertEqual((True, True), next(gen))
+        gen.close()
+        with self.assertRaises(StopIteration):
+            next(gen)
+            self.assertEqual((True, True), when_generator_closes)
+
         self.assertFalse(self.is_patched())
 
     def test_patch_coroutine_during_its_lifetime(self):
@@ -1590,6 +1636,7 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
     # It's really hard to test this behavior for a coroutine, but I assume it's
     # fine as long as the implementation is shared with a generator. Also, it's
     # really hard to fall in a case like this one with a coroutine.
+    @unittest.skipIf(platform.python_implementation() != "CPython", "Test relying on how __del__ is called by implementation")
     def test_patch_stopped_when_generator_is_collected(self):
         @patch_is_patched(scope=asynctest.GLOBAL)
         def a_generator():
@@ -1599,6 +1646,17 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
         self.assertTrue(next(gen))
         self.assertTrue(self.is_patched())
         del gen
+        self.assertFalse(self.is_patched())
+
+    def test_patch_stopped_when_generator_is_closed(self):
+        @patch_is_patched(scope=asynctest.GLOBAL)
+        def a_generator():
+            yield self.is_patched()
+
+        gen = a_generator()
+        self.assertTrue(next(gen))
+        self.assertTrue(self.is_patched())
+        gen.close()
         self.assertFalse(self.is_patched())
 
     def test_multiple_patches_on_generator(self):
