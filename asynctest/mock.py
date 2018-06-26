@@ -978,43 +978,54 @@ class _PatchedGenerator(asyncio.coroutines.CoroWrapper):
         self.__name__ = getattr(gen, '__name__', None)
         self.__qualname__ = getattr(gen, '__qualname__', None)
         self.patchings = patchings
+        self.global_patchings = [p for p in patchings if p.scope == GLOBAL]
+        self.limited_patchings = [p for p in patchings if p.scope == LIMITED]
 
         # GLOBAL patches have been started in the _patch/patched() wrapper
+
+    def _limited_patchings_stack(self):
+        with contextlib.ExitStack() as stack:
+            for patching in self.limited_patchings:
+                stack.enter_context(patching)
+
+            return stack.pop_all()
+
+    def _stop_global_patchings(self):
+        for patching in reversed(self.global_patchings):
+            if _is_started(patching):
+                patching.stop()
 
     def __repr__(self):
         return repr(self.generator)
 
     def __next__(self):
         try:
-            with contextlib.ExitStack() as stack:
-                [stack.enter_context(patching) for patching in self.patchings
-                    if patching.scope == LIMITED]
+            with self._limited_patchings_stack():
                 return self.gen.send(None)
         except BaseException:
             # the generator/coroutine terminated, stop the patchings
-            for patching in reversed(self.patchings):
-                if patching.scope == GLOBAL and _is_started(patching):
-                    patching.stop()
+            self._stop_global_patchings()
             raise
 
     def send(self, value):
-        with contextlib.ExitStack() as stack:
-            [stack.enter_context(patching) for patching in self.patchings
-                if patching.scope == LIMITED]
+        with self._limited_patchings_stack():
             return super().send(value)
 
     def throw(self, exc, value=None, traceback=None):
-        with contextlib.ExitStack() as stack:
-            [stack.enter_context(patching) for patching in self.patchings
-                if patching.scope == LIMITED]
+        with self._limited_patchings_stack():
             return self.gen.throw(exc, value, traceback)
+
+    def close(self):
+        try:
+            with self._limited_patchings_stack():
+                return self.gen.close()
+        finally:
+            self._stop_global_patchings()
 
     def __del__(self):
         # The generator/coroutine is deleted before it terminated, we must
         # still stop the patchings
-        for patching in reversed(self.patchings):
-            if patching.scope == GLOBAL and _is_started(patching):
-                patching.stop()
+        self._stop_global_patchings()
 
 
 class _patch(unittest.mock._patch):
