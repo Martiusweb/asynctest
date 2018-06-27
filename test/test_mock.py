@@ -1594,8 +1594,8 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
         gen.close()
         with self.assertRaises(StopIteration):
             next(gen)
-            self.assertEqual((True, True), when_generator_closes)
 
+        self.assertEqual((True, True), when_generator_closes)
         self.assertFalse(self.is_patched())
 
     def test_patch_coroutine_during_its_lifetime(self):
