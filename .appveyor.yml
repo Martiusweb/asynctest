@@ -1,0 +1,35 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python34"
+    - PYTHON: "C:\\Python34"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python34-x64"
+    - PYTHON: "C:\\Python34-x64"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python35"
+    - PYTHON: "C:\\Python35"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python35-x64"
+    - PYTHON: "C:\\Python35-x64"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python36"
+    - PYTHON: "C:\\Python36"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python36-x64"
+    - PYTHON: "C:\\Python36-x64"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python37"
+    - PYTHON: "C:\\Python37"
+      PYTHONASYNCIODEBUG: "1"
+    - PYTHON: "C:\\Python37-x64"
+    - PYTHON: "C:\\Python37-x64"
+      PYTHONASYNCIODEBUG: "1"
+
+install:
+  - "%PYTHON%\\python.exe -m pip install --upgrade pip"
+  - "%PYTHON%\\python.exe -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0"
+
+build: off
+
+test_script:
+  - "%PYTHON%\\python.exe -m unittest test"

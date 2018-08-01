@@ -1,39 +1,125 @@
 cache: pip
-language: python
-python:
-- 3.4
-- 3.5
-- &python_major_ver 3.6
-- nightly
-install:
-- pip install -U 'setuptools>=36.6.0'
-script:
-- python -m unittest test
 
-env:
-  matrix:
-  - ""
-  - PYTHONASYNCIODEBUG=1
-
-jobs:
+matrix:
   fast_finish: true
-
   include:
-  - stage: &deploy_stage_name deploy to PYPI
-    python: *python_major_ver
-    script: skip
-    deploy: &deploy_step
-      provider: pypi
-      distributions: "sdist bdist_wheel"
-      user: martius
-      password:
-        secure: CkgSH/6923CeZK+4ZW9Flm/az4ne7ODxhdEPWfk/NCU6pBAQNw1mCCE71kCKk8jPZ+R/1yHXR1uoXSblDmE4vNMJoHVg3NxEFZ7HZC82ZRmqSDxIMzUw+mVyvvNE6qrKXtSAOF7un8YpMrKCN60/zdOap4lcmTkrq/5R/tVH7bQ=
-      on: # Only when a tag is on master and matches vX.Y.Z
-        tags: true
-        branch: master
-        condition: '$TRAVIS_TAG =~ ^v([0-9]+\.){2}[0-9]+$'
+    - os: osx
+      language: generic
+      env: NAME="Python 3.4"
+      before_install:
+        - curl -Lo python.pkg https://www.python.org/ftp/python/3.4.4/python-3.4.4-macosx10.6.pkg
+        - sudo installer -pkg python.pkg -target /
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python 3.5"
+      before_install:
+        - curl -Lo python.pkg https://www.python.org/ftp/python/3.5.4/python-3.5.4rc1-macosx10.6.pkg
+        - sudo installer -pkg python.pkg -target /
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python 3.6"
+      before_install:
+        - curl -Lo python.pkg https://www.python.org/ftp/python/3.6.6/python-3.6.6-macosx10.9.pkg
+        - sudo installer -pkg python.pkg -target /
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python 3.7"
+      before_install:
+        - curl -Lo python.pkg https://www.python.org/ftp/python/3.7.0/python-3.7.0-macosx10.9.pkg
+        - sudo installer -pkg python.pkg -target /
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python Homebrew"
+      before_install:
+        - brew update
+        - brew upgrade python
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python HEAD"
+      before_install:
+        - brew update
+        - brew unlink python
+        - brew install python --HEAD
+        - python3 -m venv env
+        - source env/bin/activate
+    - os: osx
+      language: generic
+      env: NAME="Python pypy3"
+      before_install:
+        - brew update
+        - brew install pypy3
+        - pypy3 -m venv env
+        - source env/bin/activate
+    - os: linux
+      language: python
+      python: 3.4
+    - os: linux
+      language: python
+      python: 3.5
+    - os: linux
+      language: python
+      python: 3.6
+    - os: linux
+      language: python
+      python: &python_major_ver 3.7
+      dist: xenial
+      sudo: true
+    - os: linux
+      language: python
+      python: 3.6-dev
+    - os: linux
+      language: python
+      python: 3.7-dev
+    - os: linux
+      language: python
+      python: nightly
+    - os: linux
+      language: python
+      python: pypy3
+  allow_failures:
+    - os: osx
+      env: NAME="Python HEAD"
+    - os: osx
+      env: NAME="Python Dev"
+    - os: osx
+      env: NAME="Python pypy3"
+    - os: linux
+      python: 3.6-dev
+    - os: linux
+      python: 3.7-dev
+    - os: linux
+      python: nightly
+    - os: linux
+      python: nightly
+    - os: linux
+      python: pypy3
 
-stages:
-- test
-- name: *deploy_stage_name
-  if: tag IS present
+install:
+- curl https://bootstrap.pypa.io/get-pip.py | python
+- python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0
+
+script:
+- python -m unittest --verbose test
+- PYTHONASYNCIODEBUG=1 python -m unittest test
+
+deploy:
+  provider: pypi
+  user: martius
+  password:
+    secure: CkgSH/6923CeZK+4ZW9Flm/az4ne7ODxhdEPWfk/NCU6pBAQNw1mCCE71kCKk8jPZ+R/1yHXR1uoXSblDmE4vNMJoHVg3NxEFZ7HZC82ZRmqSDxIMzUw+mVyvvNE6qrKXtSAOF7un8YpMrKCN60/zdOap4lcmTkrq/5R/tVH7bQ=
+  distributions: sdist bdist_wheel
+  on: # Only when a tag is on master and matches vX.Y.Z
+    python: *python_major_ver
+    tags: true
+    branch: master
+    condition: '$TRAVIS_TAG =~ ^v([0-9]+\.){2}[0-9]+$'
