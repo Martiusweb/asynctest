@@ -205,17 +205,17 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
                 mock = klass(**{attr: spec})
 
                 self.assertIsInstance(mock.a_function, (asynctest.Mock, asynctest.MagicMock))
-                self.assertNotIsInstance(mock.a_function, asynctest.CoroutineMock)
-                self.assertIsInstance(mock.a_coroutine, asynctest.CoroutineMock)
-                self.assertIsInstance(mock.a_classmethod_coroutine, asynctest.CoroutineMock)
-                self.assertIsInstance(mock.a_staticmethod_coroutine, asynctest.CoroutineMock)
+                self.assertNotIsInstance(mock.a_function, asynctest.CoroutineFunctionMock)
+                self.assertIsInstance(mock.a_coroutine, asynctest.CoroutineFunctionMock)
+                self.assertIsInstance(mock.a_classmethod_coroutine, asynctest.CoroutineFunctionMock)
+                self.assertIsInstance(mock.a_staticmethod_coroutine, asynctest.CoroutineFunctionMock)
                 mock.a_coroutine.return_value = "PROBE"
                 self.assertEqual("PROBE", run_coroutine(mock.a_coroutine()))
 
                 if _using_await:
-                    self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineMock)
-                    self.assertIsInstance(mock.an_async_classmethod_coroutine, asynctest.CoroutineMock)
-                    self.assertIsInstance(mock.an_async_staticmethod_coroutine, asynctest.CoroutineMock)
+                    self.assertIsInstance(mock.an_async_coroutine, asynctest.CoroutineFunctionMock)
+                    self.assertIsInstance(mock.an_async_classmethod_coroutine, asynctest.CoroutineFunctionMock)
+                    self.assertIsInstance(mock.an_async_staticmethod_coroutine, asynctest.CoroutineFunctionMock)
                     mock.an_async_coroutine.return_value = "PROBE"
                     self.assertEqual("PROBE", run_coroutine(mock.an_async_coroutine()))
 
@@ -311,23 +311,23 @@ class Test_MagicMock(unittest.TestCase, _Test_subclass,
     class_to_test = 'MagicMock'
 
 
-class Test_CoroutineMock(unittest.TestCase, _Test_called_coroutine,
+class Test_CoroutineFunctionMock(unittest.TestCase, _Test_called_coroutine,
                          _Test_Spec_Spec_Set_Returns_Coroutine_Mock):
-    class_to_test = 'CoroutineMock'
+    class_to_test = 'CoroutineFunctionMock'
 
     def test_asyncio_iscoroutinefunction(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
         self.assertTrue(asyncio.iscoroutinefunction(mock))
 
-    def test_called_CoroutineMock_returns_MagicMock(self):
-        mock = asynctest.mock.CoroutineMock()
+    def test_called_CoroutineFunctionMock_returns_MagicMock(self):
+        mock = asynctest.mock.CoroutineFunctionMock()
         self.assertIsInstance(run_coroutine(mock()), asynctest.mock.MagicMock)
 
 
-class Test_CoroutineMock_awaited(asynctest.TestCase):
+class Test_CoroutineFunctionMock_awaited(asynctest.TestCase):
     @asynctest.fail_on(unused_loop=False)
     def test_awaited_delays_creation_of_condition(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
         self.assertIsNone(mock.awaited._condition)
         mock()
         self.assertIsNone(mock.awaited._condition)
@@ -335,8 +335,8 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         self.assertIsNotNone(mock.awaited._condition)
 
     @asyncio.coroutine
-    def test_awaited_CoroutineMock_sets_awaited(self):
-        mock = asynctest.mock.CoroutineMock()
+    def test_awaited_CoroutineFunctionMock_sets_awaited(self):
+        mock = asynctest.mock.CoroutineFunctionMock()
         yield from mock()
         self.assertTrue(mock.awaited)
 
@@ -347,14 +347,14 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         def side_effect():
             raise RuntimeError()
 
-        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+        mock = asynctest.mock.CoroutineFunctionMock(side_effect=side_effect)
 
         with self.assertRaises(RuntimeError):
             yield from mock()
 
     @asyncio.coroutine
-    def test_awaited_CoroutineMock_counts(self):
-        mock = asynctest.mock.CoroutineMock()
+    def test_awaited_CoroutineFunctionMock_counts(self):
+        mock = asynctest.mock.CoroutineFunctionMock()
         yield from mock()
         yield from mock()
         self.assertEqual(mock.await_count, 2)
@@ -366,7 +366,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         def side_effect():
             raise RuntimeError()
 
-        mock = asynctest.mock.CoroutineMock(side_effect=side_effect)
+        mock = asynctest.mock.CoroutineFunctionMock(side_effect=side_effect)
 
         with self.assertRaises(RuntimeError):
             yield from mock()
@@ -394,7 +394,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_awaited_wait(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
         t = asyncio.ensure_future(mock.awaited.wait())
         yield from mock()
         yield from mock()
@@ -409,7 +409,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_awaited_wait_next(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
         yield from mock()
         t = asyncio.ensure_future(mock.awaited.wait_next())
         yield from asyncio.sleep(0.01)
@@ -429,7 +429,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
     @asyncio.coroutine
     def test_await_args(self):
         with self.subTest('in order'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
             t1 = mock('foo')
             t2 = mock('bar')
             yield from t1
@@ -437,7 +437,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
             self.assertEqual(mock.await_args, asynctest.call('bar'))
 
         with self.subTest('out of order'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
             t1 = mock('foo')
             t2 = mock('bar')
             yield from t2
@@ -447,7 +447,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
     @asyncio.coroutine
     def test_await_args_list(self):
         with self.subTest('in order'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
             t1 = mock('foo')
             t2 = mock('bar')
             yield from t1
@@ -455,7 +455,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
             self.assertEqual(mock.await_args_list, [asynctest.call('foo'), asynctest.call('bar')])
 
         with self.subTest('out of order'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
             t1 = mock('foo')
             t2 = mock('bar')
             yield from t2
@@ -464,7 +464,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_awaited(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         with self.assertRaises(AssertionError):
             mock.assert_awaited()
@@ -474,7 +474,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_awaited_once(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         with self.assertRaises(AssertionError):
             mock.assert_awaited_once()
@@ -488,7 +488,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_awaited_with(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         with self.assertRaises(AssertionError):
             mock.assert_awaited_with('foo')
@@ -502,7 +502,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_awaited_once_with(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         with self.assertRaises(AssertionError):
             mock.assert_awaited_once_with('foo')
@@ -516,7 +516,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_any_wait(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         with self.assertRaises(AssertionError):
             mock.assert_any_await('bar')
@@ -536,7 +536,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         calls = [asynctest.call('bar'), asynctest.call('baz')]
 
         with self.subTest('any_order=False'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
 
             with self.assertRaises(AssertionError):
                 mock.assert_has_awaits(calls)
@@ -556,7 +556,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
             mock.assert_has_awaits(calls)
 
         with self.subTest('any_order=True'):
-            mock = asynctest.mock.CoroutineMock()
+            mock = asynctest.mock.CoroutineFunctionMock()
 
             with self.assertRaises(AssertionError):
                 mock.assert_has_awaits(calls, any_order=True)
@@ -577,7 +577,7 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
 
     @asyncio.coroutine
     def test_assert_not_awaited(self):
-        mock = asynctest.mock.CoroutineMock()
+        mock = asynctest.mock.CoroutineFunctionMock()
 
         mock.assert_not_awaited()
 
@@ -591,14 +591,14 @@ class TestMockInheritanceModel(unittest.TestCase):
         'NonCallableMagicMock': 'NonCallableMock',
         'Mock': 'NonCallableMock',
         'MagicMock': 'Mock',
-        'CoroutineMock': 'Mock',
+        'CoroutineFunctionMock': 'Mock',
     }
 
-    def test_Mock_is_not_CoroutineMock(self):
-        self.assertNotIsInstance(asynctest.mock.Mock(), asynctest.mock.CoroutineMock)
+    def test_Mock_is_not_CoroutineFunctionMock(self):
+        self.assertNotIsInstance(asynctest.mock.Mock(), asynctest.mock.CoroutineFunctionMock)
 
-    def test_MagicMock_is_not_CoroutineMock(self):
-        self.assertNotIsInstance(asynctest.mock.MagicMock(), asynctest.mock.CoroutineMock)
+    def test_MagicMock_is_not_CoroutineFunctionMock(self):
+        self.assertNotIsInstance(asynctest.mock.MagicMock(), asynctest.mock.CoroutineFunctionMock)
 
     @staticmethod
     def make_inheritance_test(child, parent):
@@ -660,110 +660,110 @@ class Test_patch(unittest.TestCase):
         self.assertIn("test_mock_class", called)
         self.assertIn("test_mock_function", called)
 
-    def test_patch_as_decorator_uses_CoroutineMock_on_coroutine_function(self):
+    def test_patch_as_decorator_uses_CoroutineFunctionMock_on_coroutine_function(self):
         called = False
 
         @asynctest.mock.patch('test.test_mock.Test.a_coroutine')
         def test_mock_coroutine(mock):
             nonlocal called
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
             called = True
 
         test_mock_coroutine()
         self.assertTrue(called)
 
-    def test_patch_as_decorator_uses_CoroutineMock_on_classmethod_coroutine_function(self):
+    def test_patch_as_decorator_uses_CoroutineFunctionMock_on_classmethod_coroutine_function(self):
         called = False
 
         @asynctest.mock.patch("test.test_mock.Test.a_classmethod_coroutine")
         def test_mock_coroutine(mock):
             nonlocal called
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
             called = True
 
         test_mock_coroutine()
         self.assertTrue(called)
 
-    def test_patch_as_decorator_uses_CoroutineMock_on_staticmethod_coroutine_function(self):
+    def test_patch_as_decorator_uses_CoroutineFunctionMock_on_staticmethod_coroutine_function(self):
         called = False
 
         @asynctest.mock.patch("test.test_mock.Test.a_staticmethod_coroutine")
         def test_mock_coroutine(mock):
             nonlocal called
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
             called = True
 
         test_mock_coroutine()
         self.assertTrue(called)
 
-    def test_patch_as_context_manager_uses_CoroutineMock_on_coroutine_function(self):
+    def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_coroutine_function(self):
         with asynctest.mock.patch('test.test_mock.Test.a_coroutine') as mock:
             import test.test_mock
             self.assertIs(test.test_mock.Test.a_coroutine, mock)
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
-    def test_patch_as_context_manager_uses_CoroutineMock_on_classmethod_coroutine_function(self):
+    def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_classmethod_coroutine_function(self):
         with asynctest.mock.patch('test.test_mock.Test.a_classmethod_coroutine') as mock:
             import test.test_mock
             self.assertIs(test.test_mock.Test.a_classmethod_coroutine, mock)
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
-    def test_patch_as_context_manager_uses_CoroutineMock_on_staticmethod_coroutine_function(self):
+    def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_staticmethod_coroutine_function(self):
         with asynctest.mock.patch('test.test_mock.Test.a_staticmethod_coroutine') as mock:
             import test.test_mock
             self.assertIs(test.test_mock.Test.a_staticmethod_coroutine, mock)
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
     if _using_await:
-        def test_patch_as_context_manager_uses_CoroutineMock_on_async_coroutine_function(self):
+        def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_async_coroutine_function(self):
             with asynctest.mock.patch('test.test_mock.Test.an_async_coroutine') as mock:
                 import test.test_mock
                 self.assertIs(test.test_mock.Test.an_async_coroutine, mock)
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
-        def test_patch_as_context_manager_uses_CoroutineMock_on_async_classmethod_coroutine_function(self):
+        def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_async_classmethod_coroutine_function(self):
             with asynctest.mock.patch('test.test_mock.Test.an_async_classmethod_coroutine') as mock:
                 import test.test_mock
                 self.assertIs(test.test_mock.Test.an_async_classmethod_coroutine, mock)
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
-        def test_patch_as_context_manager_uses_CoroutineMock_on_async_staticmethod_coroutine_function(self):
+        def test_patch_as_context_manager_uses_CoroutineFunctionMock_on_async_staticmethod_coroutine_function(self):
             with asynctest.mock.patch('test.test_mock.Test.an_async_staticmethod_coroutine') as mock:
                 import test.test_mock
                 self.assertIs(test.test_mock.Test.an_async_staticmethod_coroutine, mock)
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
-        def test_patch_as_decorator_uses_CoroutineMock_on_async_coroutine_function(self):
+        def test_patch_as_decorator_uses_CoroutineFunctionMock_on_async_coroutine_function(self):
             called = False
 
             @asynctest.mock.patch('test.test_mock.Test.an_async_coroutine')
             def test_mock_coroutine(mock):
                 nonlocal called
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
                 called = True
 
             test_mock_coroutine()
             self.assertTrue(called)
 
-        def test_patch_as_decorator_uses_CoroutineMock_on_async_classmethod_coroutine_function(self):
+        def test_patch_as_decorator_uses_CoroutineFunctionMock_on_async_classmethod_coroutine_function(self):
             called = False
 
             @asynctest.mock.patch('test.test_mock.Test.an_async_classmethod_coroutine')
             def test_mock_coroutine(mock):
                 nonlocal called
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
                 called = True
 
             test_mock_coroutine()
             self.assertTrue(called)
 
-        def test_patch_as_decorator_uses_CoroutineMock_on_async_staticmethod_coroutine_function(self):
+        def test_patch_as_decorator_uses_CoroutineFunctionMock_on_async_staticmethod_coroutine_function(self):
             called = False
 
             @asynctest.mock.patch('test.test_mock.Test.an_async_staticmethod_coroutine')
             def test_mock_coroutine(mock):
                 nonlocal called
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
                 called = True
 
             test_mock_coroutine()
@@ -888,13 +888,13 @@ class Test_patch_object(unittest.TestCase):
         with asynctest.mock.patch.object(obj, 'test') as mock:
             self.assertIsInstance(mock, asynctest.mock.MagicMock)
 
-    def test_patch_coroutine_function_with_CoroutineMock(self):
+    def test_patch_coroutine_function_with_CoroutineFunctionMock(self):
         with asynctest.mock.patch.object(Test(), 'a_coroutine') as mock:
-            self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
         if _using_await:
             with asynctest.mock.patch.object(Test(), 'an_async_coroutine') as mock:
-                self.assertIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
     def test_patch_decorates_coroutine(self):
         obj = Test()
@@ -922,7 +922,7 @@ class Test_patch_multiple(unittest.TestCase):
             import test.test_mock
             self.assertIsInstance(test.test_mock.Test, asynctest.mock.MagicMock)
 
-    def test_patch_coroutine_function_with_CoroutineMock(self):
+    def test_patch_coroutine_function_with_CoroutineFunctionMock(self):
         default = asynctest.mock.DEFAULT
 
         also_patch = {}
@@ -936,11 +936,11 @@ class Test_patch_multiple(unittest.TestCase):
             import test.test_mock
             obj = test.test_mock.Test()
             self.assertIsInstance(obj.a_function, asynctest.mock.MagicMock)
-            self.assertIsInstance(obj.a_coroutine, asynctest.mock.CoroutineMock)
+            self.assertIsInstance(obj.a_coroutine, asynctest.mock.CoroutineFunctionMock)
 
             if _using_await:
                 self.assertIsInstance(obj.an_async_coroutine,
-                                      asynctest.mock.CoroutineMock)
+                                      asynctest.mock.CoroutineFunctionMock)
 
     def test_patch_decorates_coroutine(self):
         patch = functools.partial(asynctest.mock.patch.multiple,
@@ -1016,19 +1016,19 @@ class Test_patch_autospec(unittest.TestCase):
             nonlocal called
             called = True
             self.assertIsInstance(mock.a_coroutine,
-                                  asynctest.mock.CoroutineMock)
+                                  asynctest.mock.CoroutineFunctionMock)
 
             self.assertIsInstance(mock().a_coroutine,
-                                  asynctest.mock.CoroutineMock)
+                                  asynctest.mock.CoroutineFunctionMock)
 
             self.assertIsInstance(mock.a_function, asynctest.mock.Mock)
             self.assertIsInstance(mock().a_function, asynctest.mock.Mock)
 
             if _using_await:
                 self.assertIsInstance(mock.an_async_coroutine,
-                                      asynctest.mock.CoroutineMock)
+                                      asynctest.mock.CoroutineFunctionMock)
                 self.assertIsInstance(mock().an_async_coroutine,
-                                      asynctest.mock.CoroutineMock)
+                                      asynctest.mock.CoroutineFunctionMock)
 
         patched()
         self.assertTrue(called)
@@ -1627,7 +1627,8 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
     # It's really hard to test this behavior for a coroutine, but I assume it's
     # fine as long as the implementation is shared with a generator. Also, it's
     # really hard to fall in a case like this one with a coroutine.
-    @unittest.skipIf(platform.python_implementation() != "CPython", "Test relying on how __del__ is called by implementation")
+    @unittest.skipIf(platform.python_implementation() != "CPython",
+            "Test relying on how __del__ is called by implementation")
     def test_patch_stopped_when_generator_is_collected(self):
         @patch_is_patched(scope=asynctest.GLOBAL)
         def a_generator():
@@ -1890,10 +1891,10 @@ class Test_create_autospec(unittest.TestCase):
     # * Ensure we check the signature of the coroutine function (and/or
     #   generator)
     # * Ensure a coroutine function attribute of a mock create with
-    #   create_autospec is a CoroutineMock
+    #   create_autospec is a CoroutineFunctionMock
     # * Ensure an instance of a class mocked from create_autospec will be an
     #   asynctest mock, and its coroutine attribute will be mocked by
-    #   a CoroutineMock
+    #   a CoroutineFunctionMock
     # * Ensure all expected create_autospec tests still run fine
     #
     # Also test cases where create_autospec is used (_patch, etc)
@@ -1921,7 +1922,7 @@ class Test_create_autospec(unittest.TestCase):
                     # This happens with mocks updated by _set_signature
                     expected_type = type(unittest_mock)
                 self.assertIsInstance(mock, expected_type)
-                self.assertNotIsInstance(mock, asynctest.mock.CoroutineMock)
+                self.assertNotIsInstance(mock, asynctest.mock.CoroutineFunctionMock)
 
     def test_autospec_of_coroutine_function_is_coroutinefunction(self):
         mock = asynctest.mock.create_autospec(Test.a_function)

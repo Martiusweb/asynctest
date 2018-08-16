@@ -58,21 +58,22 @@ TestCases
   - ClockedTestCase allows to control the loop clock and run timed events
     without waiting the wall clock.
 
-Mock and CoroutineMock
-~~~~~~~~~~~~~~~~~~~~~~
+Mock and CoroutineFunctionMock
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  - CoroutineMock is a new Mock class which mocks a coroutine function, and
-    returns a coroutine when called,
+  - CoroutineFunctionMock is a new Mock class which mocks a coroutine function,
+    and returns a coroutine when called,
 
   - MagicMock supports asynchronous context managers and asynchronous
     iterators,
 
-  - NonCallableMock, Mock and CoroutineMock can return CoroutineMock objects
-    when its attributes are get if there is a matching attribute in the spec
-    (or spec_set) object which is a coroutine function,
+  - NonCallableMock, Mock and CoroutineFunctionMock can return
+    CoroutineFunctionMock objects when its attributes are get if there is a
+    matching attribute in the spec (or spec_set) object which is a coroutine
+    function,
 
   - patch(), patch.object(), patch.multiple() return a MagickMock or
-    CoroutineMock object by default, according to the patched target,
+    CoroutineFunctionMock object by default, according to the patched target,
 
   - patch(), patch.object(), patch.multiple() handle generators and coroutines
     and their behavior can be controled when the generator or coroutine pauses,

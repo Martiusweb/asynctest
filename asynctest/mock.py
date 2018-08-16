@@ -112,7 +112,8 @@ class FakeInheritanceMeta(type):
             if issubclass(_type, (NonCallableMagicMock, Mock, )):
                 return True
 
-        if issubclass(cls, Mock) and not issubclass(cls, CoroutineMock):
+        if issubclass(cls, Mock) and \
+                not issubclass(cls, CoroutineFunctionMock):
             if issubclass(_type, (MagicMock, )):
                 return True
 
@@ -144,13 +145,13 @@ def _mock_add_spec(self, spec, *args, **kwargs):
 def _get_child_mock(self, *args, **kwargs):
     _new_name = kwargs.get("_new_name")
     if _new_name in self.__dict__['_spec_coroutines']:
-        return CoroutineMock(*args, **kwargs)
+        return CoroutineFunctionMock(*args, **kwargs)
 
     _type = type(self)
 
     if issubclass(_type, MagicMock) and _new_name in async_magic_coroutines:
-        klass = CoroutineMock
-    elif issubclass(_type, CoroutineMock):
+        klass = CoroutineFunctionMock
+    elif issubclass(_type, CoroutineFunctionMock):
         klass = MagicMock
     elif not issubclass(_type, unittest.mock.CallableMixin):
         if issubclass(_type, unittest.mock.NonCallableMagicMock):
@@ -282,7 +283,7 @@ class NonCallableMock(unittest.mock.NonCallableMock,
     ``True`` with ``mock`` as parameter.
 
     If ``spec`` or ``spec_set`` is defined and an attribute is get,
-    :class:`~asynctest.CoroutineMock` is returned instead of
+    :class:`~asynctest.CoroutineFunctionMock` is returned instead of
     :class:`~asynctest.Mock` when the matching spec attribute is a coroutine
     function.
 
@@ -315,10 +316,9 @@ class NonCallableMagicMock(AsyncMagicMixin, unittest.mock.NonCallableMagicMock,
         self._asynctest_set_is_coroutine(is_coroutine)
 
 
-class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
-    """
+class Mock(unittest.mock.Mock, metaclass=MockMetaMixin): """
     Enhance :class:`unittest.mock.Mock` so it returns
-    a :class:`~asynctest.CoroutineMock` object instead of
+    a :class:`~asynctest.CoroutineFunctionMock` object instead of
     a :class:`~asynctest.Mock` object where a method on a ``spec`` or
     ``spec_set`` object is a coroutine.
 
@@ -333,7 +333,7 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     ...         pass
 
     >>> type(asynctest.mock.Mock(Foo()).foo)
-    <class 'asynctest.mock.CoroutineMock'>
+    <class 'asynctest.mock.CoroutineFunctionMock'>
 
     >>> type(asynctest.mock.Mock(Foo()).bar)
     <class 'asynctest.mock.Mock'>
@@ -343,8 +343,8 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
 
-    If you want to mock a coroutine function, use :class:`CoroutineMock`
-    instead.
+    If you want to mock a coroutine function, use
+    :class:`CoroutineFunctionMock` instead.
 
     See :class:`~asynctest.NonCallableMock` for details about :mod:`asynctest`
     features, and :mod:`unittest.mock` for the comprehensive documentation
@@ -356,12 +356,12 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
                 metaclass=MockMetaMixin):
     """
     Enhance :class:`unittest.mock.MagicMock` so it returns
-    a :class:`~asynctest.CoroutineMock` object instead of
+    a :class:`~asynctest.CoroutineFunctionMock` object instead of
     a :class:`~asynctest.Mock` object where a method on a ``spec`` or
     ``spec_set`` object is a coroutine.
 
-    If you want to mock a coroutine function, use :class:`CoroutineMock`
-    instead.
+    If you want to mock a coroutine function, use
+    :class:`CoroutineFunctionMock` instead.
 
     :class:`MagicMock` allows to mock ``__aenter__``, ``__aexit__``,
     ``__aiter__`` and ``__anext__``.
@@ -371,7 +371,7 @@ class MagicMock(AsyncMagicMixin, unittest.mock.MagicMock,
     values to be returned during iteration.
 
     You can not mock ``__await__``. If you want to mock an object implementing
-    __await__, :class:`CoroutineMock` will likely be sufficient.
+    __await__, :class:`CoroutineFunctionMock` will likely be sufficient.
 
     see :class:`~asynctest.Mock`.
 
@@ -407,7 +407,7 @@ class _AwaitEvent:
 
         Unlike :meth:`wait` that counts any await, mock has to be awaited once
         more, disregarding to the current
-        :attr:`asynctest.CoroutineMock.await_count`.
+        :attr:`asynctest.CoroutineFunctionMock.await_count`.
 
         :param skip: How many awaits will be skipped.
                      As a result, the mock should be awaited at least
@@ -474,15 +474,16 @@ class _AwaitEvent:
         return self._mock.await_count != 0
 
 
-class CoroutineMock(Mock):
+class CoroutineFunctionMock(Mock):
     """
     Enhance :class:`~asynctest.mock.Mock` with features allowing to mock
     a coroutine function.
 
-    The :class:`~asynctest.CoroutineMock` object will behave so the object is
-    recognized as coroutine function, and the result of a call as a coroutine:
+    The :class:`~asynctest.CoroutineFunctionMock` object will behave so the
+    object is recognized as coroutine function, and the result of a call as a
+    coroutine:
 
-    >>> mock = CoroutineMock()
+    >>> mock = CoroutineFunctionMock()
     >>> asyncio.iscoroutinefunction(mock)
     True
     >>> asyncio.iscoroutine(mock())
@@ -501,7 +502,7 @@ class CoroutineMock(Mock):
       ``StopIteration`` is raised immediately,
     - if ``side_effect`` is not defined, the coroutine will return the value
       defined by ``return_value``, hence, by default, the coroutine returns
-      a new :class:`~asynctest.CoroutineMock` object.
+      a new :class:`~asynctest.CoroutineFunctionMock` object.
 
     If the outcome of ``side_effect`` or ``return_value`` is a coroutine, the
     mock coroutine obtained when the mock object is called will be this
@@ -511,6 +512,10 @@ class CoroutineMock(Mock):
     case, the :class:`~asynctest.Mock` object behavior is the same as with an
     :class:`unittest.mock.Mock` object: the wrapped object may have methods
     defined as coroutine functions.
+
+    .. versionadded:: 0.13
+       :class:`~asynctest.mock.CoroutineFunctionMock` used to be named
+       `CoroutineMock`, this name has been deprecated.
     """
     #: Property which is set when the mock is awaited. Its ``wait`` and
     #: ``wait_next`` coroutine methods can be used to synchronize execution.
@@ -613,7 +618,8 @@ class CoroutineMock(Mock):
 
     def assert_awaited_once_with(_mock_self, *args, **kwargs):
         """
-        Assert that the mock was awaited exactly once and with the specified arguments.
+        Assert that the mock was awaited exactly once and with the specified
+        arguments.
 
         .. versionadded:: 0.12
         """
@@ -702,6 +708,9 @@ class CoroutineMock(Mock):
         self.await_args_list = unittest.mock._CallList()
 
 
+CoroutineMock = CoroutineFunctionMock
+
+
 def create_autospec(spec, spec_set=False, instance=False, _parent=None,
                     _name=None, **kwargs):
     """
@@ -740,7 +749,7 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
         if instance:
             raise RuntimeError("Instance can not be True when create_autospec "
                                "is mocking a coroutine function")
-        Klass = CoroutineMock
+        Klass = CoroutineFunctionMock
     elif not unittest.mock._callable(spec):
         Klass = NonCallableMagicMock
     elif is_type and instance and not unittest.mock._instance_callable(spec):
@@ -764,8 +773,9 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             # Can't wrap the mock with asyncio.coroutine because it doesn't
             # detect a CoroWrapper as an awaitable in debug mode.
             # It is safe to do so because the mock object wrapped by
-            # _set_signature returns the result of the CoroutineMock itself,
-            # which is a Coroutine (as defined in CoroutineMock._mock_call)
+            # _set_signature returns the result of the CoroutineFunctionMock
+            # itself, which is a Coroutine (as defined in
+            # CoroutineFunctionMock._mock_call)
             mock._is_coroutine = _is_coroutine
             mock.awaited = _AwaitEvent(mock)
             mock.await_count = 0
@@ -816,7 +826,7 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
             skipfirst = unittest.mock._must_skip(spec, entry, is_type)
             kwargs['_eat_self'] = skipfirst
             if asyncio.iscoroutinefunction(original):
-                child_klass = CoroutineMock
+                child_klass = CoroutineFunctionMock
             else:
                 child_klass = MagicMock
             new = child_klass(parent=parent, name=entry, _new_name=entry,
@@ -863,7 +873,7 @@ def _update_new_callable(patcher, new, new_callable):
             original = original.__get__(None, object)
 
         if asyncio.iscoroutinefunction(original):
-            patcher.new_callable = CoroutineMock
+            patcher.new_callable = CoroutineFunctionMock
         else:
             patcher.new_callable = MagicMock
 
@@ -1104,7 +1114,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     ``new`` specifies which object will replace the ``target`` when the patch
     is applied. By default, the target will be patched with an instance of
-    :class:`~asynctest.CoroutineMock` if it is a coroutine, or
+    :class:`~asynctest.CoroutineFunctionMock` if it is a coroutine, or
     a :class:`~asynctest.MagicMock` object.
 
     It is a replacement to :func:`unittest.mock.patch`, but using
