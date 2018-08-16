@@ -149,7 +149,7 @@ install:
 
 script:
 - python -m unittest --verbose test
-- PYTHONASYNCIODEBUG=1 python -m unittest test
+- "[[ $(python -c \"import platform; print(platform.python_implementation())\") == \"CPython\" ]] && PYTHONASYNCIODEBUG=1 python -m unittest test || true"
 
 deploy:
   provider: pypi
