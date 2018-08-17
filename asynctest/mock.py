@@ -1148,7 +1148,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     the reverse order of the parameters produced by these patches for the
     patched function. And the ``@asyncio.coroutine`` decorator should be
     the last since ``@patch()`` conceptually patches the coroutine, not
-    the function.
+    the function::
 
         @patch("module.function2")
         @patch("module.function1")
