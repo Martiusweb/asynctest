@@ -20,7 +20,8 @@ A check may be only available on some platforms, activated by a conditional
 import. In this case, ``DEFAULT`` and :class:`_fail_on` can be updated in the
 module. There is an example in the :mod:`asynctest.selector` module.
 """
-from asyncio import TimerHandle
+from asyncio import Task, TimerHandle
+import traceback
 
 
 _FAIL_ON_ATTR = "_asynctest_fail_on"
@@ -32,6 +33,7 @@ _FAIL_ON_ATTR = "_asynctest_fail_on"
 DEFAULTS = {
     "unused_loop": False,
     "active_handles": False,
+    "unhandled_exceptions": False,
 }
 
 
@@ -109,6 +111,33 @@ class _fail_on:
         handles = tuple(cls._live_timer_handles(case.loop))
         if handles:
             case.fail("Loop contained unfinished work {!r}".format(handles))
+
+    @classmethod
+    def unhandled_exceptions(cls, case):
+        for t in Task.all_tasks(case.loop):
+            task_id = id(t)
+
+            if task_id not in case.unhandled_exceptions and t.done():
+                is_exc_handled = not getattr(t, '_log_traceback', False)
+
+                if not is_exc_handled:
+                    task_exc = getattr(t, '_exception')
+                    task_tb = getattr(t, '_source_traceback')
+                    case.unhandled_exceptions[task_id] = (task_exc, task_tb)
+
+        if case.unhandled_exceptions:
+            errors = []
+
+            for exc, tb in case.unhandled_exceptions.values():
+                if tb:
+                    errors.append('{!r}:\n\t{}'.format(
+                        exc,
+                        '\n'.join('\t'.join(line.splitlines(keepends=True)) for line in traceback.format_tb(tb))
+                    ))
+                else:
+                    errors.append('{!r}'.format(exc))
+
+            case.fail("Loop contained tasks with unhandled exceptions:\n{}".format('\n\n'.join(errors)))
 
 
 def fail_on(**kwargs):

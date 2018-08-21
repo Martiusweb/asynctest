@@ -342,6 +342,24 @@ class Test_TestCase(_TestCase):
                 if outcome:
                     self.assertTrue(outcome.wasSuccessful())
 
+    def test_unhandled_exception(self):
+        @asynctest.fail_on(unhandled_exceptions=True)
+        class UnhandledExceptionTest(asynctest.TestCase):
+            @asyncio.coroutine
+            def runTest(self):
+                @asyncio.coroutine
+                def coro():
+                    raise RuntimeError
+
+                yield from asyncio.wait([coro()])
+
+        cases = [UnhandledExceptionTest()]
+
+        for case in cases:
+            with self.subTest(case=case):
+                outcome = case.run()
+                self.assertFalse(outcome.wasSuccessful())
+
 
 @unittest.skipIf(sys.platform == "win32", "Tests specific to Unix")
 class Test_TestCase_and_ChildWatcher(_TestCase):
