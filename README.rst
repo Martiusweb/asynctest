@@ -1,3 +1,16 @@
+.. image:: https://img.shields.io/pypi/v/asynctest.svg
+    :target: https://pypi.python.org/pypi/asynctest
+    :alt: PyPI
+.. image:: https://travis-ci.org/Martiusweb/asynctest.svg?branch=master
+    :target: https://travis-ci.org/Martiusweb/asynctest
+    :alt: Travis
+.. image:: https://ci.appveyor.com/api/projects/status/github/Martiusweb/asynctest?branch=master&svg=true
+    :target: https://ci.appveyor.com/project/Martiusweb/asynctest/branch/master
+    :alt: AppVeyor
+.. image:: https://img.shields.io/pypi/pyversions/asynctest.svg
+    :target: https://github.com/Martiusweb/asynctest.svg
+    :alt: Supported Python versions
+
 =========
 asynctest
 =========
