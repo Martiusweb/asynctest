@@ -8,7 +8,7 @@
     :target: https://ci.appveyor.com/project/Martiusweb/asynctest/branch/master
     :alt: AppVeyor
 .. image:: https://img.shields.io/pypi/pyversions/asynctest.svg
-    :target: https://github.com/Martiusweb/asynctest.svg
+    :target: https://github.com/Martiusweb/asynctest
     :alt: Supported Python versions
 
 =========
