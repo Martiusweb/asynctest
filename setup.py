@@ -14,3 +14,11 @@ args = {
 if __name__ == "__main__":
     from setuptools import setup
     setup(**args)
+
+    try:
+        from warnings import warn
+        warn("CoroutineMock has been renamed to CoroutineFunctionMock, the alias "
+             "will be removed in the future", DeprecationWarning)
+    except DeprecationWarning as e:
+        import sys
+        print("DeprecationWarning:", str(e), file=sys.stderr)

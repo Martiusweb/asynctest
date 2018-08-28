@@ -18,9 +18,14 @@
         :members:
         :undoc-members:
 
-    .. autoclass:: asynctest.CoroutineMock
+    .. autoclass:: asynctest.CoroutineFunctionMock
         :members:
         :undoc-members:
+
+    .. class:: asynctest.CoroutineMock
+
+       .. deprecated:: 0.13
+          Use :class:`~asynctest.CoroutineFunctionMock` instead.
 
     Patch
     ~~~~~

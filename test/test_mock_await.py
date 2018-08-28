@@ -63,9 +63,9 @@ class _Test_Mock_Of_Async_Magic_Methods:
             with self.subTest(spec=spec):
                 mock_instance = asynctest.mock.MagicMock(spec)
                 self.assertIsInstance(mock_instance.__aenter__,
-                                      asynctest.mock.CoroutineMock)
+                                      asynctest.mock.CoroutineFunctionMock)
                 self.assertIsInstance(mock_instance.__aexit__,
-                                      asynctest.mock.CoroutineMock)
+                                      asynctest.mock.CoroutineFunctionMock)
 
     def test_mock_supports_async_context_manager(self, klass):
         called = False
