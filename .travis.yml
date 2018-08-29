@@ -148,8 +148,8 @@ install:
 - python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0
 
 script:
-- python -m unittest --verbose test
-- "[[ $(python -c \"import platform; print(platform.python_implementation())\") == \"CPython\" ]] && PYTHONASYNCIODEBUG=1 python -m unittest test || true"
+- python setup.py test
+- "[[ $(python -c \"import platform; print(platform.python_implementation())\") == \"CPython\" ]] && PYTHONASYNCIODEBUG=1 python setup.py test || true"
 
 deploy:
   provider: pypi

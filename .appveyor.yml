@@ -32,4 +32,4 @@ install:
 build: off
 
 test_script:
-  - "%PYTHON%\\python.exe -m unittest test"
+  - "%PYTHON%\\python.exe setup.py test"
