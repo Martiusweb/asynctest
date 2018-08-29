@@ -27,9 +27,13 @@ environment:
 
 install:
   - "%PYTHON%\\python.exe -m pip install --upgrade pip"
-  - "%PYTHON%\\python.exe -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0"
+  - "%PYTHON%\\python.exe -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0 coveralls>=1.5.0"
 
 build: off
 
 test_script:
   - "%PYTHON%\\python.exe setup.py test"
+
+after_test:
+  - "%PYTHON%\\python.exe -m coverage run setup.py test"
+  - "%PYTHON%\\python.exe -m coveralls"

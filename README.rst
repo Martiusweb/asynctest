@@ -7,6 +7,9 @@
 .. image:: https://ci.appveyor.com/api/projects/status/github/Martiusweb/asynctest?branch=master&svg=true
     :target: https://ci.appveyor.com/project/Martiusweb/asynctest/branch/master
     :alt: AppVeyor
+.. image:: https://coveralls.io/repos/github/Martiusweb/asynctest/badge.svg?branch=master
+    :target: https://coveralls.io/github/Martiusweb/asynctest?branch=master
+    :alt: Coverage
 .. image:: https://img.shields.io/pypi/pyversions/asynctest.svg
     :target: https://github.com/Martiusweb/asynctest
     :alt: Supported Python versions
