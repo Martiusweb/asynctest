@@ -230,7 +230,11 @@ class AsyncMagicMixin:
             for entry in remove_magics:
                 if entry in type(self).__dict__:
                     # remove unneeded magic methods
-                    delattr(self, entry)
+                    try:
+                        delattr(self, entry)
+                    except AttributeError:
+                        # We've deleted them already?
+                        pass
 
         # don't overwrite existing attributes if called a second time
         these_magics = these_magics - set(type(self).__dict__)
