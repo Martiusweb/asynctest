@@ -2005,5 +2005,13 @@ class Test_create_autospec(unittest.TestCase):
             asynctest.mock.create_autospec(Test.a_coroutine, instance=True)
 
 
+class Test_autospec_behavior(unittest.TestCase):
+    def test_mock_add_spec(self):
+        o = object()
+        m = asynctest.mock.create_autospec(o)
+        m.mock_add_spec(["c"])
+        assert isinstance(m.c, asynctest.MagicMock)
+
+
 if __name__ == "__main__":
     unittest.main()
