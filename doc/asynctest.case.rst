@@ -3,11 +3,12 @@
     .. toctree::
        :maxdepth: 2
 
+    .. py:currentmodule:: asynctest
 
     TestCases
     ~~~~~~~~~
 
-    .. autoclass:: asynctest.TestCase
+    .. autoclass:: TestCase
         :members:
         :undoc-members:
         :exclude-members: debug, run
@@ -25,18 +26,18 @@
 
             see :py:meth:`unittest.TestCase.tearDown()`
 
-    .. autoclass:: asynctest.FunctionTestCase
+    .. autoclass:: FunctionTestCase
         :members:
         :undoc-members:
 
-    .. autoclass:: asynctest.ClockedTestCase
+    .. autoclass:: ClockedTestCase
         :members:
         :undoc-members:
         :exclude-members: setUp
 
     Decorators
     ~~~~~~~~~~
-    .. decorator:: asynctest.fail_on(**checks)
+    .. decorator:: fail_on(**checks)
 
         Enable checks on the loop state after a test ran to help testers to
         identify common mistakes.
@@ -110,7 +111,7 @@
 
         .. versionadded:: 0.8
 
-    .. decorator:: asynctest.ignore_loop
+    .. decorator:: ignore_loop
 
        By default, a test fails if the loop did not run during the test
        (including set up and tear down), unless the
