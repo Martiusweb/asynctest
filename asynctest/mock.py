@@ -1247,6 +1247,11 @@ class _patch_dict(unittest.mock._patch_dict):
     def _patch_dict(self):
         self._is_started = True
 
+        # Since Python 3.7.3, the moment when a dict specified by a target
+        # string has been corrected. (see #115)
+        if isinstance(self.in_dict, str):
+            self.in_dict = unittest.mock._importer(self.in_dict)
+
         try:
             self._original = self.in_dict.copy()
         except AttributeError:
