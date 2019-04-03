@@ -155,7 +155,7 @@ deploy:
   provider: pypi
   user: martius
   password:
-    secure: CkgSH/6923CeZK+4ZW9Flm/az4ne7ODxhdEPWfk/NCU6pBAQNw1mCCE71kCKk8jPZ+R/1yHXR1uoXSblDmE4vNMJoHVg3NxEFZ7HZC82ZRmqSDxIMzUw+mVyvvNE6qrKXtSAOF7un8YpMrKCN60/zdOap4lcmTkrq/5R/tVH7bQ=
+    secure: "UP31EYyU/X5NlCStj80Jc9j2DKsJDe9ErsEaqaPkVi1rV8AASt38gO8qA/hcW+f56qRE34qjeaYL+vHJ6nT7wRcWWu1HU4gp4+C6THEOlNVdgB4AzaqOtNF1T6ArPXoMrKWO2sPwcLrAIls8DCzYkdYGmbtFOXGDl4n7ZubJoM8="
   distributions: sdist bdist_wheel
   on: # Only when a tag is on master and matches vX.Y.Z
     python: *python_major_ver
