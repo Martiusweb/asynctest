@@ -585,6 +585,18 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         with self.assertRaises(AssertionError):
             mock.assert_not_awaited()
 
+    def test_create_autospec_on_coroutine_and_using_assert_methods(self):
+        mock = asynctest.create_autospec(Test.a_coroutine_with_args)
+        mock.assert_not_awaited()
+
+        yield from mock("arg0", "arg1", "arg2")
+        mock.assert_awaited()  # calls assert not awaited
+        mock.assert_awaited_once()
+        mock.assert_awaited_with("arg0", "arg1", "arg2")
+        mock.assert_awaited_once_with("arg0", "arg1", "arg2")
+        mock.assert_any_await("arg0", "arg1", "arg2")
+        mock.assert_has_awaits([asynctest.call("arg0", "arg1", "arg2")])
+
 
 class TestMockInheritanceModel(unittest.TestCase):
     to_test = {
@@ -2003,7 +2015,6 @@ class Test_create_autospec(unittest.TestCase):
     def test_create_autospec_on_coroutine_with_instance_raises_RuntimeError(self):
         with self.assertRaises(RuntimeError):
             asynctest.mock.create_autospec(Test.a_coroutine, instance=True)
-
 
 if __name__ == "__main__":
     unittest.main()

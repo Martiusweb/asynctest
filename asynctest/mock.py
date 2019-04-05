@@ -779,9 +779,7 @@ def create_autospec(spec, spec_set=False, instance=False, _parent=None,
                       'assert_any_await',
                       'assert_has_awaits',
                       'assert_not_awaited'):
-                def f(*args, **kwargs):
-                    return getattr(wrapped_mock, a)(*args, **kwargs)
-                setattr(mock, a, f)
+                setattr(mock, a, getattr(wrapped_mock, a))
     else:
         unittest.mock._check_signature(spec, mock, is_type, instance)
 
