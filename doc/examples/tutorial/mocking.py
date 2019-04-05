@@ -16,6 +16,17 @@ class Client:
         raise NotImplementedError
 
 
+class AsyncClient:
+    async def add_user(self, user):
+        raise NotImplementedError
+
+    async def get_users(self):
+        raise NotImplementedError
+
+    async def increase_nb_users_cached(self, nb_cached):
+        raise NotImplementedError
+
+
 def cache_users(client, cache):
     """
     Load the list of users from a distant server accessed with ``client``,
@@ -149,3 +160,47 @@ class TestUsingCoroutineMock(asynctest.TestCase):
         self.assertEqual(len(cache), 0)
 
         client.increase_nb_users_cached.assert_awaited_once_with(0)
+
+
+class TestUsingCoroutineMockAndSpec(asynctest.TestCase):
+    async def test_no_users_to_add(self):
+        client = asynctest.Mock(AsyncClient())
+        client.get_users.return_value = []
+        cache = {}
+
+        nb_added = await cache_users_async(client, cache)
+
+        client.get_users.assert_awaited()
+        self.assertEqual(nb_added, 0)
+        self.assertEqual(len(cache), 0)
+
+        client.increase_nb_users_cached.assert_awaited_once_with(0)
+
+
+class TestAutoSpec(asynctest.TestCase):
+    async def test_functions_and_coroutines_arguments_are_checked(self):
+        client = asynctest.Mock(Client())
+        cache = {}
+
+        cache_users_mock = asynctest.create_autospec(cache_users_async)
+
+        with self.subTest("create_autospec returns a regular mock"):
+            await cache_users_mock(client, cache)
+            cache_users_mock.assert_awaited_once_with(client, cache)
+
+        with self.subTest("an exception is raised when the mock is called "
+                          "with the wrong number of arguments"):
+            with self.assertRaises(TypeError):
+                await cache_users_mock("wrong", "number", "of", "args")
+
+    async def test_create_autospec_on_a_class(self):
+        AsyncClientMock = asynctest.create_autospec(AsyncClient)
+        client = AsyncClientMock()
+
+        with self.subTest("the mock of a class returns a mock instance of "
+                          "the class"):
+            self.assertIsInstance(client, AsyncClient)
+
+        with self.subTest("attributes of the mock instance are correctly "
+                          "mocked as coroutines"):
+            await client.increase_nb_users_cached(1)

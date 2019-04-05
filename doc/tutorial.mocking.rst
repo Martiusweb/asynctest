@@ -72,7 +72,6 @@ We can leverage the mock to test another statement of the documentation and
 verify that the server is indeed notified of the number of users added to the
 cache.
 
-
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestUsingMock
 
@@ -80,9 +79,10 @@ In this example, client is a :class:`~asynctest.Mock`. This mock will reproduce
 the interface of ``Client()`` (an instance of the ``Client`` class, ommited for
 simplicity).
 
-By default, the attributes of a mock object are themselves mocks. In the above
-example, ``client.get_users`` is configured to return an empty list when
-called. By default, a new mock object would have been returned instead.
+By default, the attributes of a mock object are themselves mocks. We call them
+*child mocks*. In the above example, ``client.get_users`` is configured to
+return an empty list when called. By default, a new mock object would have been
+returned instead.
 
 Later, ``client.get_users.assert_called()`` verifies that the method has been
 called. ``client.increase_nb_users_cached.assert_called_once_with(1)`` verifies
@@ -91,24 +91,6 @@ provided.
 
 Mocks are powerful and can be configured in many ways. Unfortunatly, they can
 be somewhat complex to use.
-
-.. warning::
-
-   In the above example, ``client`` is specified as a mock of ``Client()``, but
-   ``client.get_users`` is a new mock without sepcification.
-
-   When unspecified, is it allowed to access any attribute of a mock object,
-   even if it didn't exist yet. This attribute will itself be a mock.
-
-   As a consequence, it's easy to miss a mispelled call to
-   :meth:`~unittest.mock.assert_called()`.
-
-   For instance::
-
-      client.get_users.assert_is_called()
-
-   will not fail, because accessing ``client.get_users.assert_is_called``
-   doesn't raise an :exc:`AttributeError`.
 
 The next sections of this chapter will present the features of
 :class:`asynctest.Mock` related to :mod:`asyncio`. It is recommended to be
@@ -153,17 +135,89 @@ example:
 All the features of :class:`asynctest.CoroutineMock` are decribed in the
 reference documentation.
 
-
 Mocking of other objects
 ------------------------
 
-TODO how a coroutine is detected
-TODO
+:class:`~asynctest.Mock` can be configured with the arguments of its
+constructor. The value of ``spec`` defines the list of attributes of the mock.
+:mod:`asynctest.Mock` will also detect which attributes are coroutine functions
+and mock these attributes accordingly.
 
-Auto-spec
----------
+It means that in the previous example, it was not required to assign
+:class:`~asynctest.CoroutineMock` objects to ``get_users()`` and
+``increase_nb_users_cached()``.
 
-TODO
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestUsingCoroutineMockAndSpec.test_no_users_to_add
+
+.. note::
+
+   :mod:`asynctest` will mock an attribute as a :class:`~CoroutineMock` if the
+   function is a native coroutine (``async def`` function) or a decorated
+   generator (using :func:`asyncio.coroutine``, before Python 3.5).
+
+   Some libraries document function or methods as coroutines, while they are
+   actually implemented as simple functions returning an awaitable object (like
+   :class:`asyncio.Future`).
+
+   In this case, :mod:`asynctest` can not detect that it should be mocked with
+   :class:`~asynctest.CoroutineMock`.
+
+``spec`` defines the attributes of the mock, but isn't passed to child mocks.
+In particular, using a class as ``spec`` will not reproduce the behavior of a
+constructor::
+
+   >>> ClientMock = asynctest.Mock(Client)
+   <Mock spec='Client' id='140657386768816'>
+   >>> ClientMock()
+   <Mock name='mock()' id='140657394808144'>
+   >>> ClientMock().get_users
+   <Mock name='mock().get_users' id='140657394808144'>
+
+In this example, ``ClientMock`` should mock the ``Client`` class, but
+``ClientMock()`` doesn't return a mock specified as a ``Client`` instance, and
+thus, ``ClientMock().get_users`` is not mocked as a coroutine. Autospeccing
+solves this problem.
+
+Autospeccing
+------------
+
+As the documentation of :mod:`unittest` says it,
+:func:`~asynctest.create_autospec()` creates mock objects that have the same
+attributes and methods as the objects they are replacing. Any functions and
+methods (including constructors) have the same call signature as the real
+object.
+
+It is the best solution to configure mocks to behave accurately like the object
+they replace.
+
+The mock of a function or coroutine must be called with the right arguments:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestAutoSpec.test_functions_and_coroutines_arguments_are_checked
+
+.. note::
+
+   This example also shows the use of
+   :meth:`~unittest.TestCase.assertRaises()`, which is successful only if an
+   exception is raised in the ``with`` block.
+
+   :meth:`~unittest.TestCase.subTest()` is used to document in a human-readable
+   format which case is tested. It doesn't change the outcome of the test. The
+   message is displayed if an assertion fails, which is especially useful to
+   understand faster which part of the test breaks.
+
+:func:`~asynctest.create_autospec()` will mock the constructor of a class as
+expected. When called, it returns a mock with the spec of the class:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestAutoSpec.test_create_autospec_on_a_class
+
+
+Controlling the result of :class:`~asynctest.CoroutineMock`
+-----------------------------------------------------------
+
+TODO return value, side effect, wraps
 
 asynchronous iterators and context managers
 -------------------------------------------
