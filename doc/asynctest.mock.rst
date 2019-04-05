@@ -22,6 +22,11 @@
         :members:
         :undoc-members:
 
+    Autospeccing
+    ~~~~~~~~~~~~
+
+    .. autofunction:: asynctest.create_autospec
+
     Patch
     ~~~~~
 
