@@ -994,13 +994,14 @@ class Test_patch(unittest.TestCase):
 class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
     def test_coroutine_type_when_patched(self):
         with self.subTest("old style coroutine"):
-            a_patched_coroutine = patch_is_patched()(Test.a_coroutine)
+            a_coroutine = Test.a_staticmethod_coroutine
+            a_patched_coroutine = patch_is_patched()(a_coroutine)
 
             self.assertEqual(asyncio.iscoroutinefunction(a_patched_coroutine),
-                             asyncio.iscoroutinefunction(Test.a_coroutine))
+                             asyncio.iscoroutinefunction(a_coroutine))
             self.assertEqual(inspect.isgeneratorfunction(a_patched_coroutine),
-                             inspect.isgeneratorfunction(Test.a_coroutine))
-            coro = Test.a_coroutine()
+                             inspect.isgeneratorfunction(a_coroutine))
+            coro = a_coroutine()
             patched_coro = a_patched_coroutine()
             try:
                 self.assertEqual(asyncio.iscoroutine(patched_coro),
@@ -1010,13 +1011,14 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
                 run_coroutine(patched_coro)
 
         with self.subTest("native coroutine"):
-            a_patched_coroutine = patch_is_patched()(Test.an_async_coroutine)
+            a_coroutine = Test.an_async_staticmethod_coroutine
+            a_patched_coroutine = patch_is_patched()(a_coroutine)
 
             self.assertEqual(
                     asyncio.iscoroutinefunction(a_patched_coroutine),
-                    asyncio.iscoroutinefunction(Test.an_async_coroutine))
+                    asyncio.iscoroutinefunction(a_coroutine))
 
-            coro = Test.an_async_coroutine()
+            coro = a_coroutine()
             patched_coro = a_patched_coroutine()
             try:
                 self.assertEqual(asyncio.iscoroutine(patched_coro),
@@ -1128,34 +1130,44 @@ class Test_patch_multiple(unittest.TestCase):
             self.assertIsInstance(obj.an_async_coroutine, asynctest.mock.CoroutineMock)
 
     def test_patch_decorates_coroutine(self):
-        patch = functools.partial(asynctest.mock.patch.multiple,
-                                  'test.test_mock.Test',
-                                  is_patched=lambda self: True)
+        with self.subTest("old style coroutine"):
+            @asynctest.mock.patch.multiple("test.test_mock.Test",
+                                           is_patched=lambda self: True)
+            @asyncio.coroutine
+            def a_coroutine():
+                import test.test_mock
+                return test.test_mock.Test().is_patched()
 
-        @asyncio.coroutine
-        def a_coroutine():
-            import test.test_mock
-            return test.test_mock.Test().is_patched()
+            self.assertTrue(run_coroutine(a_coroutine()))
 
-        coroutines = [a_coroutine, _using_await.transform(a_coroutine)]
+        with self.subTest("native coroutine"):
+            @asynctest.mock.patch.multiple("test.test_mock.Test",
+                                           is_patched=lambda self: True)
+            async def a_native_coroutine():
+                import test.test_mock
+                return test.test_mock.Test().is_patched()
 
-        for coroutine in coroutines:
-            with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch()(coroutine)()))
+            self.assertTrue(run_coroutine(a_native_coroutine()))
 
 
 class Test_patch_dict(unittest.TestCase):
     def test_patch_decorates_coroutine(self):
-        @asyncio.coroutine
-        def a_coroutine():
-            import test.test_mock
-            return test.test_mock.Test().a_dict['is_patched']
+        with self.subTest("old style coroutine"):
+            @patch_dict_is_patched()
+            @asyncio.coroutine
+            def a_coroutine():
+                import test.test_mock
+                return test.test_mock.Test().a_dict['is_patched']
 
-        coroutines = [a_coroutine, _using_await.transform(a_coroutine)]
+            self.assertTrue(run_coroutine(a_coroutine()))
 
-        for coroutine in coroutines:
-            with self.subTest(coroutine=coroutine):
-                self.assertTrue(run_coroutine(patch_dict_is_patched()(coroutine)()))
+        with self.subTest("native coroutine"):
+            @patch_dict_is_patched()
+            async def a_native_coroutine():
+                import test.test_mock
+                return test.test_mock.Test().a_dict['is_patched']
+
+            self.assertTrue(run_coroutine(a_native_coroutine()))
 
     def test_patch_decorates_function(self):
         @patch_dict_is_patched()
@@ -2031,13 +2043,9 @@ class Test_create_autospec(unittest.TestCase):
         def gen():
             yield from range(10)
 
-        @asyncio.coroutine
-        def coroutine():
-            yield from asyncio.sleep(0)
-
         self.assertIsInstance(gen, unittest.mock.FunctionTypes)
-        self.assertIsInstance(coroutine, unittest.mock.FunctionTypes)
-        self.assertIsInstance(_using_await.transform(coroutine),
+        self.assertIsInstance(Test.a_coroutine, unittest.mock.FunctionTypes)
+        self.assertIsInstance(Test.an_async_coroutine,
                               unittest.mock.FunctionTypes)
 
     # create_autospec:
