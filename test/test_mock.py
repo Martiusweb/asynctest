@@ -12,11 +12,6 @@ import asynctest
 
 from .utils import run_coroutine
 
-if sys.version_info >= (3, 5):
-    from . import test_mock_await as _using_await
-else:
-    _using_await = None
-
 
 class Test:
     @asyncio.coroutine
@@ -1065,12 +1060,15 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
 
             run_coroutine(tester(a_coroutine))
 
-        with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                is_instance_of_mock, is_same_mock)
-            a_new_style_coroutine = asynctest.mock.patch(
-                'test.test_mock.Test')(a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+        with self.subTest("native coroutine"):
+            @asynctest.mock.patch('test.test_mock.Test')
+            async def a_native_coroutine(fut, mock):
+                before = is_instance_of_mock(mock)
+                await fut
+                after = is_same_mock(mock)
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
 
 class Test_patch_object(unittest.TestCase):
@@ -1344,16 +1342,15 @@ class patch_scope_TestCase(unittest.TestCase):
 
             run_coroutine(tester())
 
-        with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                lambda missing_arg: None)
-            a_new_style_coroutine = patch_is_patched(scope=scope)(
-                a_new_style_coroutine)
+        with self.subTest("native coroutine"):
+            @patch_is_patched(scope=scope)
+            async def a_native_coroutine(missing_arg):
+                return None
 
             @asyncio.coroutine
             def tester():
                 try:
-                    yield from a_new_style_coroutine()
+                    yield from a_native_coroutine()
                     self.fail("Exception must raise")
                 except TypeError:
                     pass
@@ -1485,7 +1482,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             return (self.is_patched(), self.second_dict_is_patched())
 
         @asyncio.coroutine
-        def tester_couroutine(future):
+        def tester_coroutine(future):
             before = tester()
             yield from future
             after = tester()
@@ -1510,7 +1507,7 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
             @asyncio.coroutine
             def a_coroutine(future):
-                return (yield from tester_couroutine(future))
+                return (yield from tester_coroutine(future))
 
             before, between, after = run_test(a_coroutine)
             self.assertEqual((True, True), before)
@@ -1522,19 +1519,24 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
             @asyncio.coroutine
             def a_coroutine(future):
-                return (yield from tester_couroutine(future))
+                return (yield from tester_coroutine(future))
 
             before, between, after = run_test(a_coroutine)
             self.assertEqual((True, True), before)
             self.assertEqual((False, True), between)
             self.assertEqual((True, True), after)
 
-        tester_coroutine = _using_await.build_simple_coroutine(tester)
+        async def tester_native_coroutine(future):
+            before = tester()
+            await future
+            after = tester()
+            return before, after
 
         with self.subTest("new style coroutine - Outer: GLOBAL, inner: LIMITED"):
-            a_coroutine = patch_dict_is_patched(scope=asynctest.GLOBAL)(
-                patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)(
-                    tester_coroutine))
+            @patch_dict_is_patched(scope=asynctest.GLOBAL)
+            @patch_dict_second_dict_is_patched(scope=asynctest.LIMITED)
+            async def a_coroutine(future):
+                return await tester_native_coroutine(future)
 
             before, between, after = run_test(a_coroutine)
             self.assertEqual((True, True), before)
@@ -1542,9 +1544,10 @@ class Test_patch_dict_decorator_coroutine_or_generator_scope(
             self.assertEqual((True, True), after)
 
         with self.subTest("old style coroutine - Outer: LIMITED, inner: GLOBAL"):
-            a_coroutine = patch_dict_is_patched(scope=asynctest.LIMITED)(
-                patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)(
-                    tester_coroutine))
+            @patch_dict_is_patched(scope=asynctest.LIMITED)
+            @patch_dict_second_dict_is_patched(scope=asynctest.GLOBAL)
+            async def a_coroutine(future):
+                return await tester_native_coroutine(future)
 
             before, between, after = run_test(a_coroutine)
             self.assertEqual((True, True), before)
@@ -1700,22 +1703,26 @@ class Test_patch_decorator_coroutine_or_generator_scope(patch_scope_TestCase):
             run_coroutine(tester(a_coroutine))
 
         with self.subTest("new style coroutine - Outer: GLOBAL, inner: LIMITED"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                lambda: (self.is_patched(), self.second_is_patched()))
-            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
-                a_new_style_coroutine)
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            async def a_native_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                await fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
         with self.subTest("new style coroutine - Outer: LIMITED, inner: GLOBAL"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                lambda: (self.is_patched(), self.second_is_patched()))
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
-                a_new_style_coroutine)
-            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            async def a_native_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                await fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
 
 class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestCase):
@@ -1794,11 +1801,14 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
             run_coroutine(tester(a_coroutine))
 
         with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                self.is_patched)
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            async def a_native_coroutine(fut):
+                before = self.is_patched()
+                await fut
+                after = self.is_patched()
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
     # It's really hard to test this behavior for a coroutine, but I assume it's
     # fine as long as the implementation is shared with a generator. Also, it's
@@ -1875,13 +1885,15 @@ class Test_patch_decorator_coroutine_or_generator_scope_GLOBAL(patch_scope_TestC
             run_coroutine(tester(a_coroutine))
 
         with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                lambda: (self.is_patched(), self.second_is_patched()))
-            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.GLOBAL)(
-                a_new_style_coroutine)
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.GLOBAL)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_second_is_patched(scope=asynctest.GLOBAL)
+            @patch_is_patched(scope=asynctest.GLOBAL)
+            async def a_native_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                await fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
 
 class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_TestCase):
@@ -1928,11 +1940,14 @@ class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_Test
             run_coroutine(tester(a_coroutine))
 
         with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                self.is_patched)
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.LIMITED)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_is_patched(scope=asynctest.LIMITED)
+            async def a_native_coroutine(fut):
+                before = self.is_patched()
+                await fut
+                after = self.is_patched()
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
     def test_patched_coroutine_with_mock_args(self):
         @asynctest.mock.patch('test.test_mock.Test', side_effect=lambda: None,
@@ -1976,13 +1991,15 @@ class Test_patch_decorator_coroutine_or_generator_scope_LIMITED(patch_scope_Test
             run_coroutine(tester(a_coroutine))
 
         with self.subTest("new style coroutine"):
-            a_new_style_coroutine = _using_await.build_simple_coroutine(
-                lambda: (self.is_patched(), self.second_is_patched()))
-            a_new_style_coroutine = patch_second_is_patched(scope=asynctest.LIMITED)(
-                a_new_style_coroutine)
-            a_new_style_coroutine = patch_is_patched(scope=asynctest.LIMITED)(
-                a_new_style_coroutine)
-            run_coroutine(tester(a_new_style_coroutine))
+            @patch_second_is_patched(scope=asynctest.LIMITED)
+            @patch_is_patched(scope=asynctest.LIMITED)
+            async def a_native_coroutine(fut):
+                before = (self.is_patched(), self.second_is_patched())
+                await fut
+                after = (self.is_patched(), self.second_is_patched())
+                return before, after
+
+            run_coroutine(tester(a_native_coroutine))
 
 
 class Test_return_once(unittest.TestCase):
