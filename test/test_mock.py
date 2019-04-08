@@ -1,4 +1,5 @@
 # coding: utf-8
+# pylama: ignore=E501  noqa
 
 import asyncio
 import functools
