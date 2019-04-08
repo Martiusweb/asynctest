@@ -232,7 +232,7 @@ class _Test_Spec_Spec_Set_Returns_Coroutine_Mock:
 
                 self.assertIn("{}='{}".format(attr, "Test"), repr(mock))
                 self.assertIn("name='mock.a_coroutine'", repr(mock.a_coroutine))
-                mock.a_coroutine()  # is a generator, not a Mock with a repr
+                run_coroutine(mock.a_coroutine())
                 self.assertIn("name='mock.a_function()'", repr(mock.a_function()))
                 self.assertEqual("call.a_coroutine()", repr(mock.mock_calls[0]))
                 self.assertEqual("call.a_function()", repr(mock.mock_calls[1]))
@@ -509,10 +509,14 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
     def test_awaited_delays_creation_of_condition(self):
         mock = asynctest.mock.CoroutineMock()
         self.assertIsNone(mock.awaited._condition)
-        mock()
-        self.assertIsNone(mock.awaited._condition)
-        run_coroutine(mock())
-        self.assertIsNotNone(mock.awaited._condition)
+
+        coro = mock()
+        condition_before_run = mock.awaited._condition
+        run_coroutine(coro)
+        condition_after_run = mock.awaited._condition
+
+        self.assertIsNone(condition_before_run)
+        self.assertIsNotNone(condition_after_run)
 
     @asyncio.coroutine
     def test_awaited_CoroutineMock_sets_awaited(self):
