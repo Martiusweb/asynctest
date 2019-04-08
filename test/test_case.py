@@ -13,11 +13,6 @@ import unittest.mock
 
 import asynctest
 
-if sys.version_info >= (3, 5):
-    from . import test_case_await as _using_await
-else:
-    _using_await = None
-
 
 class Test:
     class FooTestCase(asynctest.TestCase):
@@ -203,19 +198,25 @@ class Test_TestCase(_TestCase):
         class CoroutineFunctionTest(asynctest.TestCase):
             ran = False
 
+            async def noop(self):
+                pass
+
             @asyncio.coroutine
             def runTest(self):
                 self.ran = True
-                yield from []
+                yield from self.noop()
 
-        cases = [CoroutineFunctionTest()]
-        if _using_await:
-            cases.append(_using_await.CoroutineFunctionTest())
+        class NativeCoroutineFunctionTest(CoroutineFunctionTest):
+            async def runTest(self):
+                self.ran = True
+                await self.noop()
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in cases:
+                for case in (CoroutineFunctionTest(),
+                             NativeCoroutineFunctionTest()):
                     with self.subTest(case=case):
+                        case.ran = False
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
@@ -223,17 +224,25 @@ class Test_TestCase(_TestCase):
         class CoroutineTest(asynctest.TestCase):
             ran = False
 
-            def runTest(self):
-                return asyncio.coroutine(lambda: setattr(self, 'ran', True))()
+            @asyncio.coroutine
+            def set_ran(self):
+                self.ran = True
 
-        cases = [CoroutineTest()]
-        if _using_await:
-            cases.append(_using_await.CoroutineTest())
+            def runTest(self):
+                return self.set_ran()
+
+        class NativeCoroutineTest(CoroutineTest):
+            async def set_ran(self):
+                self.ran = True
+
+            def runTest(self):
+                return self.set_ran()
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in cases:
+                for case in (CoroutineTest(), NativeCoroutineTest()):
                     with self.subTest(case=case):
+                        case.ran = False
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
