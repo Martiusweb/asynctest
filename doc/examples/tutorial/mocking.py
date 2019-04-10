@@ -1,6 +1,7 @@
 # coding: utf-8
 import asyncio
 import collections
+import itertools
 
 import asynctest
 
@@ -204,3 +205,68 @@ class TestAutoSpec(asynctest.TestCase):
         with self.subTest("attributes of the mock instance are correctly "
                           "mocked as coroutines"):
             await client.increase_nb_users_cached(1)
+
+
+class TestCoroutineMockResult(asynctest.TestCase):
+    async def test_result_set_with_return_value(self):
+        coroutine_mock = asynctest.CoroutineMock()
+        result = object()
+        coroutine_mock.return_value = result
+
+        # return the expected result
+        self.assertIs(result, await coroutine_mock())
+        # always return the same result
+        self.assertIs(await coroutine_mock(), await coroutine_mock())
+
+    async def test_result_with_side_effect_function(self):
+        def uppercase_all(*args):
+            return tuple(arg.upper() for arg in args)
+
+        coroutine_mock = asynctest.CoroutineMock()
+        coroutine_mock.side_effect = uppercase_all
+
+        self.assertEqual(("FIRST", "CALL"),
+                         await coroutine_mock("first", "call"))
+        self.assertEqual(("A", "SECOND", "CALL"),
+                         await coroutine_mock("a", "second", "call"))
+
+    async def test_result_with_side_effect_exception(self):
+        coroutine_mock = asynctest.CoroutineMock()
+        coroutine_mock.side_effect = NotImplementedError
+
+        # Raise an exception of the configured type
+        with self.assertRaises(NotImplementedError):
+            await coroutine_mock("any", "number", "of", "args")
+
+        coroutine_mock.side_effect = Exception("an instance of exception")
+
+        # Raise the exact specified object
+        with self.assertRaises(Exception) as context:
+            await coroutine_mock()
+
+        self.assertIs(coroutine_mock.side_effect, context.exception)
+
+    async def test_result_with_side_effect_iterable(self):
+        coroutine_mock = asynctest.CoroutineMock()
+        coroutine_mock.side_effect = ["one", "two", "three"]
+
+        self.assertEqual("one", await coroutine_mock())
+        self.assertEqual("two", await coroutine_mock())
+        self.assertEqual("three", await coroutine_mock())
+
+        coroutine_mock.side_effect = itertools.cycle(["odd", "even"])
+        self.assertEqual("odd", await coroutine_mock())
+        self.assertEqual("even", await coroutine_mock())
+        self.assertEqual("odd", await coroutine_mock())
+        self.assertEqual("even", await coroutine_mock())
+
+    async def test_result_with_wrapped_object(self):
+        stub = StubClient()
+        mock = asynctest.Mock(stub, wraps=stub)
+        cache = {}
+
+        stub.add_user(StubClient.User(1, "a.dmin"))
+        cache_users(mock, cache)
+
+        mock.get_users.assert_called()
+        self.assertEqual(stub.users_to_return, mock.get_users())

@@ -52,7 +52,7 @@ Currently, the test can be described this way:
      * ``client.get_users()`` will return an empty result,
      * and that the cache is empty,
 
-   a call to ``cache_user()`` must leave the cache empty.
+   a call to ``cache_users()`` must leave the cache empty.
 
 Instead, it should be:
 
@@ -61,7 +61,7 @@ Instead, it should be:
      * ``client.get_users()`` will return an empty result,
      * and that the cache is empty,
 
-   a call to ``cache_user()`` *must have queried the client* and must leaves
+   a call to ``cache_users()`` *must have queried the client* and must leaves
    the cache empty.
 
 Mocks solve both of the issues discussed above. A mock can be configured to act
@@ -149,6 +149,7 @@ It means that in the previous example, it was not required to assign
 
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestUsingCoroutineMockAndSpec.test_no_users_to_add
+   :dedent: 4
 
 .. note::
 
@@ -195,6 +196,7 @@ The mock of a function or coroutine must be called with the right arguments:
 
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestAutoSpec.test_functions_and_coroutines_arguments_are_checked
+   :dedent: 4
 
 .. note::
 
@@ -212,12 +214,122 @@ expected. When called, it returns a mock with the spec of the class:
 
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestAutoSpec.test_create_autospec_on_a_class
+   :dedent: 4
 
+Types of mocks
+--------------
+
+There are several types of mocks with slightly different features:
+
+* :class:`~asynctest.Mock` is the base mock type.
+* :class:`~asynctest.MagicMock`, it is very similar to :class:`~asynctest.Mock`,
+  except that magic methods are also mocks, and can be configured::
+
+   >>> asynctest.Mock().__hash__
+   <method-wrapper '__hash__' of Mock object at 0x7fb514e3a748>
+   >>> asynctest.MagicMock().__hash__
+   <MagicMock name='mock.__hash__' id='140415716319528'>
+   >>> asynctest.MagicMock().__hash__.return_value = "custom value"
+
+* :class:`~asynctest.NonCallableMock` and
+  :class:`~asynctest.NonCallableMagicMock` are their non-callable counterparts.
+  It's usually better to use them when mocking objects or values.
+* :class:`~asynctest.CoroutineMock` mocks a coroutine function (or, more
+  generaly, any callable object returning an awaitable).
+
+As mentioned before, a *child mock* is a mock attached to another mock. The
+child mock is either an attribute of the parent mock, or the result of a call
+to the parent mock. This relationship enables some features documented in the
+documentation of :class:`unittest.mock.Mock`.
+
+Attaching a child mock is just a matter of setting the right attribute::
+
+   client_mock = asynctest.Mock()
+   # manually attaching a child mock to get_users
+   mock.get_users = asynctest.Mock()
+   # manually attaching the returned child mock to get_users()
+   mock.get_users.return_value = asynctest.NonCallableMock()
+
+By default, the child mock is the result of the factory method
+:meth:`~unittest.mock.Mock._get_child_mock()`, and its result depend on the
+type of mock:
+
+==========================================  ================================
+ parent mock                                 child mock
+==========================================  ================================
+ :class:`~asynctest.Mock`                    :class:`~asynctest.Mock`
+ :class:`~asynctest.MagicMock`               :class:`~asynctest.MagicMock`
+ :class:`~asynctest.NonCallableMock`         :class:`~asynctest.Mock`
+ :class:`~asynctest.NonCallableMagicMock`    :class:`~asynctest.MagicMock`
+ :class:`~asynctest.CoroutineMock`           :class:`~asynctest.MagicMock`
+==========================================  ================================
 
 Controlling the result of :class:`~asynctest.CoroutineMock`
 -----------------------------------------------------------
 
-TODO return value, side effect, wraps
+Calling a :class:`~asynctest.CoroutineMock` returns a coroutine which can be
+awaited.
+
+The result of this coroutine can be configured like the result of a call to a
+mock.
+
+``return_value``
+~~~~~~~~~~~~~~~~
+
+The simplest way to configure the result of a mock is to set its
+``return_value`` attribute. This result will always be returned as it is.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCoroutineMockResult.test_result_set_with_return_value
+   :dedent: 4
+
+``side_effect``
+~~~~~~~~~~~~~~~
+
+The ``side_effect`` attribute of a mock enables more control over the result of
+the mock. If set, it has priority over ``return_value``, which is ignored.
+
+The value of ``side_effect`` can be a function. In this case, the call to the
+mock is forwarded to this function, and its result is returned.
+
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCoroutineMockResult.test_result_with_side_effect_function
+   :dedent: 4
+
+If the side effect is an exception object or class, this exception is raised.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCoroutineMockResult.test_result_with_side_effect_exception
+   :dedent: 4
+
+Last but not least, ``side_effect`` can be any iterable object. In this case,
+the mock will return each value once, until the iterator is exhausted and
+:exc:`StopIteration` is raised to the caller.
+
+:func:`itertools.cycle` allows to repeat the iterator.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCoroutineMockResult.test_result_with_side_effect_iterable
+   :dedent: 4
+
+Wrapped object
+~~~~~~~~~~~~~~
+
+A mock can also wrap an object. This wrapped object is defined as an argument
+passed to the constructor of the mock.
+
+When a mock or any of its attributes is called, the call is forwarded to the
+wrapped object, like if it was the value of ``side_effect``. If ``side_effect``
+or ``return_value`` are set for the mock, they will have priority over the
+wrapper.
+
+In practice, this is equivalent to adding the features of a
+:class:`~asynctest.Mock` to a stub object.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCoroutineMockResult.test_result_with_wrapped_object
+   :dedent: 4
 
 asynchronous iterators and context managers
 -------------------------------------------
