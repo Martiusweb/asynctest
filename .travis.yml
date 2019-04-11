@@ -145,11 +145,15 @@ matrix:
 
 install:
 - curl https://bootstrap.pypa.io/get-pip.py | python
-- python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0
+- python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0 coveralls>=1.5.0
 
 script:
-- python -m unittest --verbose test
-- "[[ $(python -c \"import platform; print(platform.python_implementation())\") == \"CPython\" ]] && PYTHONASYNCIODEBUG=1 python -m unittest test || true"
+- python setup.py test
+- "[[ $(python -c \"import platform; print(platform.python_implementation())\") == \"CPython\" ]] && PYTHONASYNCIODEBUG=1 python setup.py test || true"
+
+after_success:
+- python -m coverage run setup.py test
+- python -m coveralls
 
 deploy:
   provider: pypi
