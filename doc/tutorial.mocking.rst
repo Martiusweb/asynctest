@@ -313,6 +313,18 @@ the mock will return each value once, until the iterator is exhausted and
    :pyobject: TestCoroutineMockResult.test_result_with_side_effect_iterable
    :dedent: 4
 
+.. important::
+
+   If the value of ``side_effect`` is a coroutine function or a generator
+   function, it is treated as a regular function.
+
+   The result of a call to this mock will be an instance of the coroutine or
+   generator.
+
+   As of asynctest 0.12, specifying a coroutine function as the side effect of
+   :class:`~asynctest.CoroutineMock` is undefined and should be avoided.
+   See `Github issue #31 <https://github.com/Martiusweb/asynctest/issues/31>`_.
+
 Wrapped object
 ~~~~~~~~~~~~~~
 
@@ -331,10 +343,140 @@ In practice, this is equivalent to adding the features of a
    :pyobject: TestCoroutineMockResult.test_result_with_wrapped_object
    :dedent: 4
 
-asynchronous iterators and context managers
+Asynchronous iterators and context managers
 -------------------------------------------
 
-TODO
+Python 3.5 introduced the support for asynchronous iterators and context
+managers. They can be implemented with the magic methods ``__aiter__``,
+``__anext__``, ``__aenter__``, ``__aexit__`` as described in
+:pep:`0492#asynchronous-context-managers-and-async-with`.
+
+:class:`~asynctest.MagicMock` will mock these methods and greatly simplify
+their configuration.
+
+In the example used in this chapter, it was assumed that ``client.get_users()``
+loads all users from a database and store them in a list that it will return.
+This implementation may consume a lot of memory if there are a lot of users to
+return. This problem can be solved with a *cursor*.
+
+A cursor is an object *pointing to* the result of the query *get all users* on
+the database. It keeps an open connection to the database and fetches the
+objects lazily (only when they are really needed). It allows to load the users
+one by one from the database, and avoid filling the memory with all users at
+once.
+
+It is also common to wrap several related queries to a database in a
+transaction to ensure the sequence of calls is consistent. A better
+implementation of ``cache_users()`` should keep the calls to ``get_users()``
+and ``increase_nb_users_cached()`` in the same transaction.
+
+The ``cache_users()`` implementation will look like this:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: cache_users_with_cursor
+
+``client.new_transaction()`` returns a transaction object. Under the hood,
+``async with`` calls its coroutine method ``__aenter__`` and the result is
+stored in the variable ``transaction``.
+
+``users_cursor`` is an asynchronously iterable object. It implements the method
+``__aiter__()``, which returns an asynchronous iterator. ``__aiter__()`` is a
+function, not a coroutine. For each iteration of the ``async for`` loop,  the
+coroutine method ``__anext__()`` of the asynchronous iterator is called and its
+result is assigned to ``user``.
+
+When the interpreter leaves the ``async with`` block, ``__aexit__()`` is
+called.
+
+The next sections show how to use :class:`~asynctest.MagicMock` to test this
+method.
+
+Asynchronous context manager
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`~asynctest.MagicMock` mocks ``__aenter__`` with a
+:class:`~asynctest.CoroutineMock` returning a new child mock.
+
+If an exception is raised in an ``async with`` block, this exception is passed
+to ``__aexit__()``. In this case, the return value defines wether the
+interpreter suppresses or propagates the exception, as described in the
+documentation of :meth:`object.__exit__`.
+
+:class:`~asynctest.MagicMock`` mocks ``__aexit__()`` with a
+:class:`~asynctest.CoroutineMock` returning ``False`` by default, which means
+that the exception is propagated.
+
+By default, a :class:`~asynctest.MagicMock` can be used in an ``async with``
+block without configuration, exceptions raised in this block are propagated:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestWithMagicMethods.test_context_manager
+   :dedent: 4
+
+However, in the example above, the ``transaction`` object exposes the same
+methods as ``client``. In particular, this mock must bet configured so
+``transaction.increase_nb_users_cached()`` is a coroutine.
+
+Asynchronous iterator
+~~~~~~~~~~~~~~~~~~~~~
+
+The method ``__aiter__()`` of a :class:`~asynctest.MagicMock` returns an
+asynchronous iterator. By default, this iterator is empty.
+
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestWithMagicMethods.test_empty_iterable
+   :dedent: 4
+
+The values yielded by the iterator can be configured by setting the
+``return_value`` of ``__aiter__``. This value must be an iterable object, such
+as a list or a generator:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestWithMagicMethods.test_iterable
+   :dedent: 4
+
+.. note::
+
+   As of asynctest 0.12, it is not possible to use an asynchronously iterable
+   object as ``return_value`` for ``__aiter__()``.
+
+   Setting ``side_effect`` allows to override the behavior of
+   :class:`~asynctest.MagicMock`.
+
+Putting it all together
+~~~~~~~~~~~~~~~~~~~~~~~
+
+A test of ``cache_users_with_cursor()`` can leverage several mocking features
+of :mod:`asynctest`:
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCacheWithMagicMethods
+
+This example deserve some explanation.
+
+First, :func:`~asynctest.create_autospec()` is used to build a mock of the
+class `AsyncClient`.
+
+``transaction`` will be the object configured as a context manager. When called
+with ``async with``, it must return an object with an interface as ``client``.
+``AsyncClientMock`` is set as a side effect to ``transaction.__aenter__()``,
+which means that a new mock of an instance of ``AsyncClient`` will be issued
+each time ``transaction`` is used in an ``async width`` block.
+
+``cursor`` will be used in the ``async for`` loop. The iterator will yield the
+values of ``cursor.__aiter__.return_value``. It is set to a list containing a
+single ``User`` object. A new iterator is created each time an ``async for``
+loop is called upon the cursor, it is safe to use this mock several times.
+
+``client`` is a mock created from ``AsyncClientMock``. It is configured to so
+the return values of ``client.new_transaction()`` and
+``client.get_users_cursor()``.
+
+The behavior of ``client``'s attributes are configured, not those of
+``AsyncClientMock``. This is because it is not part of the spec and isn't
+propagated to its child mocks.
+
 
 Patching
 --------

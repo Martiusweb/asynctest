@@ -1,4 +1,6 @@
 # coding: utf-8
+# pylama: ignore=C0103, ignore camel case variable name (AsyncClientMock)
+
 import asyncio
 import collections
 import itertools
@@ -18,14 +20,49 @@ class Client:
 
 
 class AsyncClient:
-    async def add_user(self, user):
+    async def add_user(self, user, transaction=None):
         raise NotImplementedError
 
-    async def get_users(self):
+    async def get_users(self, transaction=None):
         raise NotImplementedError
 
-    async def increase_nb_users_cached(self, nb_cached):
+    async def increase_nb_users_cached(self, nb_cached, transaction=None):
         raise NotImplementedError
+
+    def get_users_cursor(self, transaction=None):
+        return self.Cursor(transaction or self)
+
+    def new_transaction(self):
+        return self.Transaction(self)
+
+    class Transaction:
+        def __init__(self, client):
+            self.client = client
+
+        def __call__(self, funcname, *args, **kwargs):
+            """
+            Forwards the call to the client, with the argument ``transaction ``
+            set.
+            """
+            method = getattr(self.client, funcname)
+            return method(*args, transaction=self, **kwargs)
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+    class Cursor:
+        def __init__(self, transaction):
+            self.transaction = transaction
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            # if the request has not been started, do it there
+            raise NotImplementedError
 
 
 def cache_users(client, cache):
@@ -270,3 +307,73 @@ class TestCoroutineMockResult(asynctest.TestCase):
 
         mock.get_users.assert_called()
         self.assertEqual(stub.users_to_return, mock.get_users())
+
+
+async def cache_users_with_cursor(client, cache):
+    nb_users_cached = 0
+
+    async with client.new_transaction() as transaction:
+        users_cursor = transaction.get_users_cursor()
+
+        async for user in users_cursor:
+            if user.id not in cache:
+                nb_users_cached += 1
+                cache[user.id] = user
+
+        await transaction.increase_nb_users_cached(nb_users_cached)
+
+    return nb_users_cached
+
+
+class TestWithMagicMethods(asynctest.TestCase):
+    async def test_context_manager(self):
+        with self.assertRaises(AssertionError):
+            async with asynctest.MagicMock() as context:
+                # context is a MagicMock
+                context.assert_called()
+
+    async def test_empty_iterable(self):
+        loop_iterations = 0
+        async for _ in asynctest.MagicMock():
+            loop_iterations += 1
+
+        self.assertEqual(0, loop_iterations)
+
+    async def test_iterable(self):
+        loop_iterations = 0
+        mock = asynctest.MagicMock()
+        mock.__aiter__.return_value = range(5)
+        async for _ in mock:
+            loop_iterations += 1
+
+        self.assertEqual(5, loop_iterations)
+
+
+class TestCacheWithMagicMethods(asynctest.TestCase):
+    async def test_one_user_added_to_cache(self):
+        user = StubClient.User(1, "a.dmin")
+
+        AsyncClientMock = asynctest.create_autospec(AsyncClient)
+
+        transaction = asynctest.MagicMock()
+        transaction.__aenter__.side_effect = AsyncClientMock
+
+        cursor = asynctest.MagicMock()
+        cursor.__aiter__.return_value = [user]
+
+        client = AsyncClientMock()
+        client.new_transaction.return_value = transaction
+        client.get_users_cursor.return_value = cursor
+
+        cache = {}
+
+        # The user has been added to the cache
+        nb_added = await cache_users_with_cursor(client, cache)
+
+        self.assertEqual(nb_added, 1)
+        self.assertEqual(cache[1], user)
+
+        # The user was already there
+        nb_added = await cache_users_with_cursor(client, cache)
+        self.assertEqual(nb_added, 0)
+        self.assertEqual(cache[1], user)
