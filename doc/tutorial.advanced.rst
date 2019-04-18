@@ -1,12 +1,44 @@
 Advanced Features
 =================
 
-TODO
+This chapter describes miscellaneous features of :mod:`asynctest` which can be
+leveraged in specific use cases.
 
 Controlling time
 ----------------
 
-TODO
+Tests running calls to :func:`asyncio.sleep` will take as long as the sum of
+all these calls. These calls are frequent when testing for timeouts, for
+instance.
+
+In many cases, this will add a useless delay to the execution of the test
+suite, and encourage the test authors to deactivate or ignore these tests.
+
+:class:`~asynctest.ClockedTestCase` is a subclass of
+:class:`~asynctest.TestCase` which allows a to advance the clock of the loop in
+a test with the coroutine :meth:`~asynctest.ClockedTestCase.advance`.
+
+This will not affect the wall clock: functions like :func:`time.time` or
+:meth:`datetime.datetime.now()` will return the regular date and time of the
+system.
+
+.. literalinclude:: examples/tutorial/clock.py
+   :pyobject: TestAdvanceTime
+
+Internally, :class:`~asynctest.ClockedTestCase` will ensure that the loop is
+executed as if time was passing *fast*, instead of jumping the clock to the
+target time.
+
+.. literalinclude:: examples/tutorial/clock.py
+   :pyobject: TestWithClockAndCallbacks
+
+This example schedules function calls to be executed later by the loop.
+Each call will verify that it runs at the expected time.
+``@fail_on(active_handles=True)`` ensures that the callbacks have been executed
+when the test finishes.
+
+The source code of ``is_time_around()`` can be found in the example file
+:doc:`examples/tutorial/clock.py`.
 
 Helpers
 -------
