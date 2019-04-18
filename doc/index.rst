@@ -30,6 +30,13 @@ Reference
    asynctest.selector
    asynctest.helpers
 
+Code examples
+-------------
+
+.. toctree::
+   :maxdepth: 2
+
+   examples/index
 
 Contribute
 ----------
