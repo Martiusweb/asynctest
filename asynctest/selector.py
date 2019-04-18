@@ -172,7 +172,7 @@ def set_read_ready(fileobj, loop):
 
         loop.add_reader(mock, read_ready, mock)
 
-        set_read_ready()
+        set_read_ready(mock, loop)
 
         loop.run_forever() # prints received: b"Data"
 

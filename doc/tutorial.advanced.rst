@@ -40,15 +40,57 @@ when the test finishes.
 The source code of ``is_time_around()`` can be found in the example file
 :doc:`examples/tutorial/clock.py`.
 
-Helpers
--------
-
-TODO
-
 Mocking I/O
 -----------
 
-Selector mock etc TODO
+Testing libraries or functions dealing with low-level IO objects may be
+complex. For instance, mocking a socket or a file-like object, because
+simulating their behavior may require to know exactly how the tested library
+will used them.
+
+Even worse, using mocks in place of files will often raise :exc:`OSError`.
+
+:mod:`asynctest` provides special mocks which can be used in place of actual
+file-like objects. They are supported by the loop provided by
+:class:`~asynctest.TestCase` if the loop uses a standard implementation with a
+selector (Window's Proactor loop or uvloop are not supported).
+
+These mocks are configured with a spec matching common file-like objects.
+
+=================================== ========================================
+  Mock                               ``spec``
+=================================== ========================================
+ :class:`~asynctest.FileMock`        a file object, implements ``fileno()``
+ :class:`~asynctest.SocketMock`      :class:`socket.socket`
+ :class:`~asynctest.SSLSocketMock`   :class:`ssl.SSLSocket`
+=================================== ========================================
+
+:func:`asynctest.isfilemock()` can be used to differenciate mocks from regular
+objects.
+
+As of :mod:`asynctest` 0.12, these mocks don't provide other features, and must
+be configured to return expected values for calls to methods like ``read()`` or
+``recv()``.
+
+However, when configured, it is necessary to force the loop to detect that I/O
+is possible on these mock files.
+
+This is done with :func:`~asynctest.set_read_ready()` and
+:func:`~asynctest.set_write_ready()`.
+
+
+.. literalinclude:: examples/tutorial/mocking_io.py
+   :pyobject: TestMockASocket
+
+In this example a socket mock is configured to simulate a simple
+request-response scenario. Some data is available to read on the socket once a
+request has been written. ``recv_side_effect()`` makes as if the data is
+received in several packets, but it has no impact on the high level
+:class:`~asyncio.StreamReader`.
+
+It's common that while a read operation blocks until data is available, a write
+is often successful.  Thus, the case where the congestion control delays the
+write has not been simulated.
 
 Testing with event loop policies
 --------------------------------
