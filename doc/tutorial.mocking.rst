@@ -388,6 +388,9 @@ result is assigned to ``user``.
 When the interpreter leaves the ``async with`` block, ``__aexit__()`` is
 called.
 
+A partial implementation of this logic can be found in the example file
+:doc:`examples/tutorial/mocking.py`.
+
 The next sections show how to use :class:`~asynctest.MagicMock` to test this
 method.
 
@@ -568,7 +571,7 @@ the coroutine is running.
 This situation is illustrated in the example bellow. The test case
 ``TestMustBePatched`` runs a task in background which fails if some patch is
 active. It contains two tests: one which shows the test conflicting, and one
-which uses the :data:`~asnyctest.LIMITED` ``scope`` to deactivate the patch
+which uses the :data:`~asynctest.LIMITED` ``scope`` to deactivate the patch
 outside of the test coroutine.
 
 .. literalinclude:: examples/tutorial/patching.py
@@ -577,7 +580,7 @@ outside of the test coroutine.
 In this example, ``happened_once()`` pauses the coroutine until the background
 task checked once that the patch is not active. The code of
 ``must_be_patched``, ``happened_once()`` and ``terminate_and_check_task()`` is
-available in the complete example. **TODO**
+available in the example file :doc:`examples/tutorial/patching.py`.
 
 However, when ``await must_be_patched.is_patched()`` runs, it is still in the
 scope of the test, because this coroutine is executed in the same task as the
