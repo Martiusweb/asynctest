@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-Mocking of Selector
+Module ``selector``
 -------------------
 
 Mock of :mod:`selectors` and compatible objects performing asynchronous IO.

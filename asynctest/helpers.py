@@ -1,7 +1,7 @@
 # coding: utf-8
 """
-Helpers
--------
+Module ``helpers``
+------------------
 
 Helper functions and coroutines for :mod:`asynctest`.
 """

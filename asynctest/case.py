@@ -1,7 +1,7 @@
 # coding: utf-8
 """
-Module asynctest.case
----------------------
+Module ``case``
+---------------
 
 Enhance :class:`unittest.TestCase`:
 
@@ -23,7 +23,7 @@ Enhance :class:`unittest.TestCase`:
 * a test fails if the loop did not run during the test.
 
 class-level set-up
-------------------
+~~~~~~~~~~~~~~~~~~
 
 Since each test runs in its own loop, it is not possible to run
 :meth:`~TestCase.setUpClass()` and :meth:`~TestCase.tearDownClass()` as
