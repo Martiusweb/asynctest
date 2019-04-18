@@ -4,6 +4,7 @@
 import asyncio
 import collections
 import itertools
+import logging
 
 import asynctest
 
@@ -87,6 +88,8 @@ def cache_users(client, cache):
 
     client.increase_nb_users_cached(nb_users_cached)
 
+    logging.debug("added %d users to the cache %r", nb_users_cached, cache)
+
     return nb_users_cached
 
 
@@ -160,6 +163,9 @@ async def cache_users_async(client, cache):
             cache[user.id] = user
 
     await client.increase_nb_users_cached(nb_users_cached)
+
+    logging.debug("added %d users to the cache %r", nb_users_cached, cache)
+
     return nb_users_cached
 
 
@@ -322,6 +328,8 @@ async def cache_users_with_cursor(client, cache):
 
         await transaction.increase_nb_users_cached(nb_users_cached)
 
+    logging.debug("added %d users to the cache %r", nb_users_cached, cache)
+
     return nb_users_cached
 
 
@@ -377,3 +385,25 @@ class TestCacheWithMagicMethods(asynctest.TestCase):
         nb_added = await cache_users_with_cursor(client, cache)
         self.assertEqual(nb_added, 0)
         self.assertEqual(cache[1], user)
+
+
+class TestCachingIsLogged(asynctest.TestCase):
+    async def test_with_context_manager(self):
+        client = asynctest.Mock(AsyncClient())
+        cache = {}
+
+        with asynctest.patch("logging.debug") as debug_mock:
+            await cache_users_async(client, cache)
+
+        debug_mock.assert_called()
+
+    @asynctest.patch("logging.error")
+    @asynctest.patch("logging.debug")
+    async def test_with_decorator(self, debug_mock, error_mock):
+        client = asynctest.Mock(AsyncClient())
+        cache = {}
+
+        await cache_users_async(client, cache)
+
+        debug_mock.assert_called()
+        error_mock.assert_not_called()

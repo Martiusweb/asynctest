@@ -3,40 +3,44 @@
     .. toctree::
        :maxdepth: 2
 
+    .. py:currentmodule:: asynctest
+
     Mock classes
     ~~~~~~~~~~~~
 
-    .. autoclass:: asynctest.Mock
+    .. autoclass:: Mock
         :members:
         :undoc-members:
 
-    .. autoclass:: asynctest.NonCallableMock
+    .. autoclass:: NonCallableMock
         :members:
         :undoc-members:
 
-    .. autoclass:: asynctest.MagicMock
+    .. autoclass:: MagicMock
         :members:
         :undoc-members:
 
-    .. autoclass:: asynctest.CoroutineMock
+    .. autoclass:: CoroutineMock
         :members:
         :undoc-members:
 
     Autospeccing
     ~~~~~~~~~~~~
 
-    .. autofunction:: asynctest.create_autospec
+    .. autofunction:: create_autospec
 
     Patch
     ~~~~~
 
-    .. autodata:: asynctest.GLOBAL
+    .. autodata:: GLOBAL
 
-    .. autodata:: asynctest.LIMITED
+    .. autodata:: LIMITED
 
-    .. autofunction:: asynctest.patch
+    .. autofunction:: patch
 
-    .. function:: asynctest.patch.object(target, attribute, new=DEFAULT, \
+    .. py:currentmodule:: asynctest.patch
+
+    .. function:: object(target, attribute, new=DEFAULT, \
                     spec=None, create=False, spec_set=None, autospec=None, \
                     new_callable=None, scope=asynctest.GLOBAL, **kwargs)
 
@@ -45,7 +49,7 @@
 
         See :func:`~asynctest.patch` and :func:`unittest.mock.patch.object`.
 
-    .. function:: asynctest.patch.multiple(target, spec=None, create=False, \
+    .. function:: multiple(target, spec=None, create=False, \
                     spec_set=None, autospec=None, new_callable=None, \
                     scope=asynctest.global, **kwargs)
 
@@ -55,7 +59,7 @@
 
         See :func:`~asynctest.patch` and :func:`unittest.mock.patch.multiple`.
 
-    .. function:: asynctest.patch.dict(in_dict, values=(), clear=False, \
+    .. function:: dict(in_dict, values=(), clear=False, \
                     scope=asynctest.GLOBAL, **kwargs)
 
         Patch a dictionary, or dictionary like object, and restore the
@@ -79,9 +83,11 @@
         :see: :func:`~asynctest.patch` (details about ``scope``) and
             :func:`unittest.mock.patch.dict`.
 
+    .. py:currentmodule:: asynctest
+
     Helpers
     ~~~~~~~
 
-    .. autofunction:: asynctest.mock_open
+    .. autofunction:: mock_open
 
-    .. autofunction:: asynctest.return_once
+    .. autofunction:: return_once

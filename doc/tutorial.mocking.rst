@@ -481,9 +481,111 @@ propagated to its child mocks.
 Patching
 --------
 
-TODO
+Patching is a mechanism allowing to temporarily replace a symbol (class,
+object, function, attribute, ...) by a mock, in-place. It is especially useful
+when one need a mock, but can't pass it as a parameter of the function to be
+tested.
+
+For instance, if ``cache_users()`` didn't accept the ``client`` argument, but
+instead created a new client, it would not be possible to replace it by a mock
+like in all the previous examples.
+
+When an object is hard to mock, it sometimes shows a limitation in the design:
+a coupling that is too tight, the use of a global variable (or a singleton),
+etc. However, it's not always possible or desirable to change the code to
+accomodate the tests. A common situation where tight coupling is almost
+invisible is when performing logging or monitoring. In this case, patching will
+help.
+
+A :func:`~asynctest.patch` can be used as a context manager. It will replace
+the target (:func:`logging.debug`) with a mock during the lifetime of the
+``with`` block.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCachingIsLogged.test_with_context_manager
+   :dedent: 4
+
+Alternatively, :func:`~asynctest.patch` can be used to decorate a test or a
+test class (inheriting :class:`~asynctest.TestCase`). This second example is
+roughly equivalent to the previous one. The main difference is that for all
+tests affected by the patch (the decorated method or all test methods in a test
+class) must accept an additional argument which will receive  the mock object
+used by the patch.
+
+Note that when using multiple decorators on a single method, the order of the
+arguments is inversed compared to the order of the decorators. This is due to
+the way decorators work in Python, a topic which will not covered in this
+documentation.
+
+.. literalinclude:: examples/tutorial/mocking.py
+   :pyobject: TestCachingIsLogged.test_with_decorator
+   :dedent: 4
+
+.. note::
+
+   In practice, :meth:`unittest.TestCase.assertLogs()` allows to assert that
+   certain messages have been logged and makes more sense than manually
+   patching :mod:`logging`.
+
+
+There are variants of :func:`~asynctest.patch`:
+
+* :func:`asynctest.patch.object` patches the attribute of a given
+  object,
+* :func:`asynctest.patch.multiple` patches several attributes of a given
+  object,
+* :func:`asynctest.patch.dict` patches the values in a ``dict`` for the given
+  indices.
+
+The official python documentation provide extensive details about how to define
+the target of a patch in its section :ref:`where-to-patch`.
 
 Scope of the patch
 ~~~~~~~~~~~~~~~~~~
 
-TODO
+There is one hidden catch in the examples above: what happens to the patch when
+the interpreter reaches the ``await`` statement and pauses the coroutine?
+
+When patch is used as a context manager, the patch stays active until the
+interpreter reached the end of the ``with`` block.
+
+When used as a decorator, the patch is activated right before the function (or
+coroutine) is executed, and deactivated once it returned. This is equivalent to
+englobing the body of the function in a ``with`` statement instead of using the
+decorator.
+
+However, since couroutines are asynchronous, the work performed by the
+interpreter while the coroutine is paused is unpredictable. In some cases, the
+patch can conflict with something else, and must only be activated when
+the patched coroutine is running.
+
+It is possible to control when a :func:`asynctest.patch` must be active when
+applied to a coroutine with the argument ``scope``.
+
+If ``scope`` is set to :data:`asynctest.LIMITED`, the patch is active only when
+the coroutine is running.
+
+This situation is illustrated in the example bellow. The test case
+``TestMustBePatched`` runs a task in background which fails if some patch is
+active. It contains two tests: one which shows the test conflicting, and one
+which uses the :data:`~asnyctest.LIMITED` ``scope`` to deactivate the patch
+outside of the test coroutine.
+
+.. literalinclude:: examples/tutorial/patching.py
+   :pyobject: TestMustBePatched
+
+In this example, ``happened_once()`` pauses the coroutine until the background
+task checked once that the patch is not active. The code of
+``must_be_patched``, ``happened_once()`` and ``terminate_and_check_task()`` is
+available in the complete example. **TODO**
+
+However, when ``await must_be_patched.is_patched()`` runs, it is still in the
+scope of the test, because this coroutine is executed in the same task as the
+coroutine which calls it (the test).
+
+Conclusion
+----------
+
+This chapter showed most of the concepts and features of mock relevant when
+testing asynchronous code. There are plenty of other features and subtleties
+which are covered in the documentation of :mod:`unittest.mock`.
