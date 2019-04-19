@@ -26,9 +26,9 @@ ensures that ``True`` is, well, true.
 :class:`~asynctest.TestCase`. If the test is successful, it does nothing. Else,
 it raises an :exc:`AssertionError`.
 
-The list of assertion methods implemented by :mod:`unittest` can be found in
-its documentation: :py:ref:`assert-methods`. :class:`asynctest.TestCase` also
-brings some assertion methods.
+The documentation of :mod:`unittest` lists :py:ref:`assertion methods
+<assert-methods>` implemented by :class:`unittest.TestCase`.
+:class:`asynctest.TestCase` adds some more for asynchronous code.
 
 We can run it by creating an instance of our test case, its constructor takes
 the name of the test method as argument:

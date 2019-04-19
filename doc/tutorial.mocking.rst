@@ -68,16 +68,16 @@ Mocks solve both of the issues discussed above. A mock can be configured to act
 like an actual object, and provides assertion methods to verify how the object
 has been used.
 
-We can leverage the mock to test another statement of the documentation and
-verify that the server is indeed notified of the number of users added to the
-cache.
+We can also leverage the mock to test another statement of the documentation
+and make the test even more accurate. We will verify that the server is indeed
+notified of the number of users added to the cache.
 
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestUsingMock
 
 In this example, client is a :class:`~asynctest.Mock`. This mock will reproduce
 the interface of ``Client()`` (an instance of the ``Client`` class, ommited for
-simplicity).
+simplicity, available in the example file :doc:`examples/tutorial/mocking.py`).
 
 By default, the attributes of a mock object are themselves mocks. We call them
 *child mocks*. In the above example, ``client.get_users`` is configured to
@@ -119,7 +119,7 @@ a coroutine function, this is not the case of its mock counterpart.
 This test can also miss a new bug now: what if
 ``client.increase_nb_users_cached()`` is never awaited? The method has been
 called, and since the result is a :class:`~asyncio.Future`, this mistake will
-not be caught if the test run with asyncio's :ref:`asyncio-debug-mode`.
+not be caught if the test runs with asyncio's :ref:`asyncio-debug-mode`.
 
 :class:`asynctest.CoroutineMock` is a type of mock which specializes in mocking
 coroutine functions (defined with ``async def``). A
@@ -153,9 +153,10 @@ It means that in the previous example, it was not required to assign
 
 .. note::
 
-   :mod:`asynctest` will mock an attribute as a :class:`~CoroutineMock` if the
-   function is a native coroutine (``async def`` function) or a decorated
-   generator (using :func:`asyncio.coroutine``, before Python 3.5).
+   :mod:`asynctest` will mock an attribute as a
+   :class:`~asynctest.CoroutineMock` if the function is a native coroutine
+   (``async def`` function) or a decorated generator (using
+   :func:`asyncio.coroutine`, before Python 3.5).
 
    Some libraries document function or methods as coroutines, while they are
    actually implemented as simple functions returning an awaitable object (like
@@ -177,8 +178,8 @@ constructor::
 
 In this example, ``ClientMock`` should mock the ``Client`` class, but
 ``ClientMock()`` doesn't return a mock specified as a ``Client`` instance, and
-thus, ``ClientMock().get_users`` is not mocked as a coroutine. Autospeccing
-solves this problem.
+thus, ``ClientMock().get_users`` is not mocked as a coroutine. We need
+autospeccing to fix this.
 
 Autospeccing
 ------------
@@ -347,17 +348,17 @@ Asynchronous iterators and context managers
 -------------------------------------------
 
 Python 3.5 introduced the support for asynchronous iterators and context
-managers. They can be implemented with the magic methods ``__aiter__``,
-``__anext__``, ``__aenter__``, ``__aexit__`` as described in
+managers. They can be implemented with the magic methods ``__aiter__()``,
+``__anext__()``, ``__aenter__()``, ``__aexit__()`` as described in
 :pep:`0492#asynchronous-context-managers-and-async-with`.
 
 :class:`~asynctest.MagicMock` will mock these methods and greatly simplify
 their configuration.
 
-In the example used in this chapter, it was assumed that ``client.get_users()``
-loads all users from a database and store them in a list that it will return.
-This implementation may consume a lot of memory if there are a lot of users to
-return. This problem can be solved with a *cursor*.
+In the example we used so far, we assumed that ``client.get_users()`` loads all
+users from a database and store them in a list that it will return. This
+implementation may consume a lot of memory if there are a lot of users to
+return. We can instead use a *cursor*.
 
 A cursor is an object *pointing to* the result of the query *get all users* on
 the database. It keeps an open connection to the database and fetches the
@@ -376,7 +377,7 @@ The ``cache_users()`` implementation will look like this:
    :pyobject: cache_users_with_cursor
 
 ``client.new_transaction()`` returns a transaction object. Under the hood,
-``async with`` calls its coroutine method ``__aenter__`` and the result is
+``async with`` calls its coroutine method ``__aenter__()`` and the result is
 stored in the variable ``transaction``.
 
 ``users_cursor`` is an asynchronously iterable object. It implements the method
@@ -405,11 +406,11 @@ to ``__aexit__()``. In this case, the return value defines wether the
 interpreter suppresses or propagates the exception, as described in the
 documentation of :meth:`object.__exit__`.
 
-:class:`~asynctest.MagicMock`` mocks ``__aexit__()`` with a
+:class:`~asynctest.MagicMock` mocks ``__aexit__`` with a
 :class:`~asynctest.CoroutineMock` returning ``False`` by default, which means
 that the exception is propagated.
 
-By default, a :class:`~asynctest.MagicMock` can be used in an ``async with``
+By default, we can use a :class:`~asynctest.MagicMock` in an ``async with``
 block without configuration, exceptions raised in this block are propagated:
 
 .. literalinclude:: examples/tutorial/mocking.py
@@ -417,7 +418,7 @@ block without configuration, exceptions raised in this block are propagated:
    :dedent: 4
 
 However, in the example above, the ``transaction`` object exposes the same
-methods as ``client``. In particular, this mock must bet configured so
+methods as ``client``. In particular, We must configure this mock so
 ``transaction.increase_nb_users_cached()`` is a coroutine.
 
 Asynchronous iterator
@@ -450,42 +451,41 @@ as a list or a generator:
 Putting it all together
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-A test of ``cache_users_with_cursor()`` can leverage several mocking features
-of :mod:`asynctest`:
+We can leverage  several features of :mod:`asynctest` when testing
+``cache_users_with_cursor()``:
 
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestCacheWithMagicMethods
 
 This example deserve some explanation.
 
-First, :func:`~asynctest.create_autospec()` is used to build a mock of the
+First, we use :func:`~asynctest.create_autospec()` to build a mock of the
 class `AsyncClient`.
 
 ``transaction`` will be the object configured as a context manager. When called
 with ``async with``, it must return an object with an interface as ``client``.
-``AsyncClientMock`` is set as a side effect to ``transaction.__aenter__()``,
+We set ``AsyncClientMock`` as a side effect to ``transaction.__aenter__``,
 which means that a new mock of an instance of ``AsyncClient`` will be issued
 each time ``transaction`` is used in an ``async width`` block.
 
 ``cursor`` will be used in the ``async for`` loop. The iterator will yield the
-values of ``cursor.__aiter__.return_value``. It is set to a list containing a
+values of ``cursor.__aiter__.return_value``. We set to a list containing a
 single ``User`` object. A new iterator is created each time an ``async for``
 loop is called upon the cursor, it is safe to use this mock several times.
 
-``client`` is a mock created from ``AsyncClientMock``. It is configured to so
-the return values of ``client.new_transaction()`` and
-``client.get_users_cursor()``.
+We then create ``client``, a mock created from ``AsyncClientMock``. We
+configure it so the return values of ``client.new_transaction()`` and
+``client.get_users_cursor()`` are the mocks we created above.
 
-The behavior of ``client``'s attributes are configured, not those of
-``AsyncClientMock``. This is because it is not part of the spec and isn't
-propagated to its child mocks.
-
+Note that we configured the behavior of ``client``'s attributes, not those of
+``AsyncClientMock``. This is because the child mock of an autospecced class
+will not inherit the behavior of the parent mock, only its spec.
 
 Patching
 --------
 
 Patching is a mechanism allowing to temporarily replace a symbol (class,
-object, function, attribute, ...) by a mock, in-place. It is especially useful
+object, function, attribute, …) by a mock, in-place. It is especially useful
 when one need a mock, but can't pass it as a parameter of the function to be
 tested.
 
@@ -511,13 +511,13 @@ the target (:func:`logging.debug`) with a mock during the lifetime of the
 Alternatively, :func:`~asynctest.patch` can be used to decorate a test or a
 test class (inheriting :class:`~asynctest.TestCase`). This second example is
 roughly equivalent to the previous one. The main difference is that for all
-tests affected by the patch (the decorated method or all test methods in a test
-class) must accept an additional argument which will receive  the mock object
-used by the patch.
+tests affected by the patch (the decorated method or all test methods in a
+decorated test class) must accept an additional argument which will receive
+the mock object used by the patch.
 
 Note that when using multiple decorators on a single method, the order of the
 arguments is inversed compared to the order of the decorators. This is due to
-the way decorators work in Python, a topic which will not covered in this
+the way decorators work in Python, a topic which we don't cover in this
 documentation.
 
 .. literalinclude:: examples/tutorial/mocking.py
@@ -526,9 +526,9 @@ documentation.
 
 .. note::
 
-   In practice, :meth:`unittest.TestCase.assertLogs()` allows to assert that
-   certain messages have been logged and makes more sense than manually
-   patching :mod:`logging`.
+   In practice, we should have used :meth:`unittest.TestCase.assertLogs()`. It
+   asserts that a given message have been logged and makes more sense than
+   manually patching :mod:`logging`.
 
 
 There are variants of :func:`~asynctest.patch`:
@@ -559,7 +559,7 @@ decorator.
 
 However, since couroutines are asynchronous, the work performed by the
 interpreter while the coroutine is paused is unpredictable. In some cases, the
-patch can conflict with something else, and must only be activated when
+patch can conflict with something else, and must only be active when
 the patched coroutine is running.
 
 It is possible to control when a :func:`asynctest.patch` must be active when
@@ -582,9 +582,15 @@ task checked once that the patch is not active. The code of
 ``must_be_patched``, ``happened_once()`` and ``terminate_and_check_task()`` is
 available in the example file :doc:`examples/tutorial/patching.py`.
 
-However, when ``await must_be_patched.is_patched()`` runs, it is still in the
-scope of the test, because this coroutine is executed in the same task as the
-coroutine which calls it (the test).
+``test_patching_conflicting()`` fails because the patch is still active when it
+is paused and aways the ``self.checked`` event. While paused, the background
+task runs, and crashes because the patch is still active.
+
+In ``test_patching_not_conflicting()``, the patch is set with a
+:data:`~asynctest.LIMITED` scope, and is active only when the coroutine runs.
+When ``await must_be_patched.is_patched()`` runs, the patch is still active.
+This coroutine runs in the scope of the outher coroutine (the test): indeed,
+``must_be_patched.is_patched()`` is scheduled in the task running the test.
 
 Conclusion
 ----------
