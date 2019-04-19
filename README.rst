@@ -35,7 +35,9 @@ Documentation
 .. image:: https://readthedocs.org/projects/asynctest/badge/
    :target: http://asynctest.readthedocs.org/en/latest/
 
-Full documentation is available at http://asynctest.readthedocs.org/en/latest/,
+Full documentation is available at http://asynctest.readthedocs.org/en/latest/.
+It includes a tutorial with tested examples of how to use ``TestCase`` or
+mocks.
 
 Features
 --------
