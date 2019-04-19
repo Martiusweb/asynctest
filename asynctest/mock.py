@@ -1,7 +1,7 @@
 # coding: utf-8
 """
-Mock objects
-------------
+Module ``mock``
+---------------
 
 Wrapper to unittest.mock reducing the boilerplate when testing asyncio powered
 code.
