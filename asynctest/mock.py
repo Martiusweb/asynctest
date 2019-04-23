@@ -52,6 +52,7 @@ if sys.version_info >= (3, 5):
         return __aiter__
 
     unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
+    unittest.mock._all_magics |= _async_magics
 else:
     _awaitable = None
     async_magic_coroutines = _async_magics = set()
@@ -130,6 +131,8 @@ def _set_is_coroutine(self, value):
     self.__dict__['_mock_is_coroutine'] = value
 
 
+# _mock_add_spec() is the actual private implementation in unittest.mock, we
+# override it to support coroutines in the metaclass.
 def _mock_add_spec(self, spec, *args, **kwargs):
     unittest.mock.NonCallableMock._mock_add_spec(self, spec, *args, **kwargs)
 
