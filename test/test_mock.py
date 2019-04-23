@@ -2016,5 +2016,27 @@ class Test_create_autospec(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             asynctest.mock.create_autospec(Test.a_coroutine, instance=True)
 
+    if _using_await:
+        def test_mock_add_spec_on_mock_created_with_autospec(self):
+            # See bug #107
+            mock = asynctest.mock.create_autospec(Test())
+
+            self.assertFalse(hasattr(mock, "added_attribute"))
+            mock.mock_add_spec(["added_attribute"])
+            self.assertIsInstance(mock.added_attribute, asynctest.Mock)
+
+            self.assertFalse(hasattr(mock, "__aenter__"))
+            mock.mock_add_spec(["__aenter__"])
+            self.assertTrue(hasattr(mock, "__aenter__"))
+
+        def test_mock_add_spec_on_mock_with_magics(self):
+            instance =_using_await._Test_Mock_Of_Async_Magic_Methods.WithAsyncContextManager()
+            mock = asynctest.mock.create_autospec(instance)
+
+            self.assertFalse(hasattr(mock, "added_attribute"))
+            mock.mock_add_spec(["added_attribute"])
+            self.assertIsInstance(mock.added_attribute, asynctest.Mock)
+
+
 if __name__ == "__main__":
     unittest.main()
