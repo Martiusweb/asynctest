@@ -2162,7 +2162,7 @@ class Test_create_autospec(unittest.TestCase):
         self.assertTrue(hasattr(mock, "__aenter__"))
 
     def test_mock_add_spec_on_mock_with_magics(self):
-        instance =_using_await._Test_Mock_Of_Async_Magic_Methods.WithAsyncContextManager()
+        instance = _Test_Mock_Of_Async_Magic_Methods.WithAsyncContextManager()
         mock = asynctest.mock.create_autospec(instance)
 
         self.assertFalse(hasattr(mock, "added_attribute"))
