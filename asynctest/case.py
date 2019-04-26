@@ -433,6 +433,8 @@ class ClockedTestCase(TestCase):
     """
     Subclass of :class:`~asynctest.TestCase` with a controlled loop clock,
     useful for testing timer based behaviour without slowing test run time.
+
+    The clock will only advance when :meth:`advance()` is called.
     """
     def _init_loop(self):
         super()._init_loop()

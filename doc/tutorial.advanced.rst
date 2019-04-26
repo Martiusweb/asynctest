@@ -15,8 +15,9 @@ In many cases, this will add a useless delay to the execution of the test
 suite, and encourage us to deactivate or ignore these tests.
 
 :class:`~asynctest.ClockedTestCase` is a subclass of
-:class:`~asynctest.TestCase` which allows to advance the clock of the loop in
-a test with the coroutine :meth:`~asynctest.ClockedTestCase.advance`.
+:class:`~asynctest.TestCase` which replaces the clock of the loop in a test
+with a manually-controlled one. The clock will only advance when calling
+:meth:`~asynctest.ClockedTestCase.advance`.
 
 This will not affect the wall clock: functions like :func:`time.time` or
 :meth:`datetime.datetime.now` will return the regular date and time of the
