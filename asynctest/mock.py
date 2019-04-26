@@ -946,13 +946,20 @@ def _decorate_coroutine_callable(func, new_patching):
     patchings = [new_patching]
 
     def patched_factory(*args, **kwargs):
+        # Patches must be copied for each instance of the coroutine, to avoid
+        # concurrency issues. If we don't do that the first coroutine instance
+        # to terminate will deactivate the patch and break the other
+        # coroutines.
+        # If one wants to ensure the same patch mock is used for concurrent
+        # coroutines, it must set it explicitly.
+        local_patchings = [patching.copy() for patching in patchings]
         extra_args = []
         patchers_to_exit = []
         patch_dict_with_limited_scope = []
 
         exc_info = tuple()
         try:
-            for patching in patchings:
+            for patching in local_patchings:
                 arg = patching.__enter__()
                 if patching.scope == LIMITED:
                     patchers_to_exit.append(patching)
@@ -974,7 +981,7 @@ def _decorate_coroutine_callable(func, new_patching):
 
             args += tuple(extra_args)
             gen = func(*args, **kwargs)
-            return _PatchedGenerator(gen, patchings,
+            return _PatchedGenerator(gen, local_patchings,
                                      asyncio.iscoroutinefunction(func))
         except BaseException:
             if patching not in patchers_to_exit and _is_started(patching):
@@ -1090,6 +1097,7 @@ class _patch(unittest.mock._patch):
 
     def __enter__(self):
         # When patching a coroutine, we reuse the same mock object
+        # for the whole instance of the coroutine
         if self.mock_to_reuse is not None:
             self.target = self.getter()
             self.temp_original, self.is_local = self.get_original()
@@ -1147,7 +1155,8 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     ``new`` specifies which object will replace the ``target`` when the patch
     is applied. By default, the target will be patched with an instance of
     :class:`~asynctest.CoroutineMock` if it is a coroutine, or
-    a :class:`~asynctest.MagicMock` object.
+    a :class:`~asynctest.MagicMock` object. In this case, the mock is passed as
+    an extra positional argument.
 
     It is a replacement to :func:`unittest.mock.patch`, but using
     :mod:`asynctest.mock` objects.
@@ -1163,7 +1172,15 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
         yields a value and pauses its execution (with ``yield``, ``yield from``
         or ``await``).
 
-    The behavior differs from :func:`unittest.mock.patch` for generators.
+    Since asynctest 0.13, each instance of the generator or coroutine will have
+    its own set of patches. When several instances of the same coroutine are
+    running concurrently, they will patch the same target. If ``new`` is left
+    to its default vaue, the patched target is subject to a race condition. At
+    some point, its value might not be the same as the one passed to the extra
+    argument.
+
+    To avoid this problem, ``scope`` should be set to
+    :const:`~asynctest.LIMITED`, or ``new`` should be specified.
 
     When used as a context manager, the patch is still active even if the
     generator or coroutine is paused, which may affect concurrent tasks::
@@ -1202,6 +1219,9 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     .. versionadded:: 0.6 patch into generators and coroutines with
                       a decorator.
+
+    .. versionadded:: 0.13 patchs are now associated with a generator or
+                      coroutine instance instead of the function.
     """
     getter, attribute = unittest.mock._get_target(target)
     patcher = _patch(getter, attribute, new, spec, create, spec_set, autospec,
@@ -1262,6 +1282,12 @@ class _patch_dict(unittest.mock._patch_dict):
         self.scope = scope
         self._is_started = False
         self._global_patchings = []
+
+    def copy(self):
+        patcher = _patch_dict(self.in_dict, self.values, self.clear,
+                              self.scope)
+        patcher._global_patchings = [p.copy() for p in self._global_patchings]
+        return patcher
 
     def _keep_global_patch(self, other_patching):
         self._global_patchings.append(other_patching)
