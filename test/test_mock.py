@@ -1255,6 +1255,31 @@ class Test_patch_dict(unittest.TestCase):
         self.assertTrue(run_coroutine(instance.test_a_coroutine()))
         self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
 
+    def test_patch_decorates_concurrent_coroutines(self):
+        # See bug #121
+        with self.subTest("old style coroutine"):
+            @patch_dict_is_patched()
+            @asyncio.coroutine
+            def a_coroutine(recursive):
+                import test.test_mock
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+                if recursive:
+                    yield from a_coroutine(False)
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+
+            run_coroutine(a_coroutine(True))
+
+        with self.subTest("native coroutine"):
+            @patch_dict_is_patched()
+            async def a_native_coroutine(recursive):
+                import test.test_mock
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+                if recursive:
+                    await a_native_coroutine(False)
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+
+            run_coroutine(a_native_coroutine(True))
+
 
 class Test_patch_autospec(unittest.TestCase):
     test_class_path = "{}.Test".format(__name__)
