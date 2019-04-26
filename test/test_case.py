@@ -1,4 +1,5 @@
 # coding: utf-8
+# pylama: ignore=E501 noqa
 
 import asyncio
 import itertools
@@ -12,11 +13,6 @@ import unittest
 import unittest.mock
 
 import asynctest
-
-if sys.version_info >= (3, 5):
-    from . import test_case_await as _using_await
-else:
-    _using_await = None
 
 
 class Test:
@@ -97,6 +93,11 @@ class Test_TestCase(_TestCase):
             with self.subTest(method=method, test=test), \
                     unittest.mock.patch('asyncio.new_event_loop') as mock:
                 mock_loop = unittest.mock.Mock(asyncio.AbstractEventLoop)
+                mock_loop.run_until_complete.side_effect = default_loop.run_until_complete
+
+                if sys.version_info >= (3, 6):
+                    mock_loop.shutdown_asyncgens = asynctest.CoroutineMock()
+
                 mock.return_value = mock_loop
 
                 case = LoopTest(test)
@@ -109,9 +110,11 @@ class Test_TestCase(_TestCase):
                 mock_loop.close.assert_called_with()
 
                 if sys.version_info >= (3, 6):
-                    mock_loop.run_until_complete.__wrapped__.assert_called_with(mock_loop.shutdown_asyncgens())
+                    mock_loop.shutdown_asyncgens.assert_awaited()
 
+                # If failing is True, one of the assertions in runTest failed
                 self.assertFalse(case.failing)
+                # Also, ensure we didn't override the original loop
                 self.assertIs(default_loop, asyncio.get_event_loop())
 
     def test_default_loop_is_not_created_when_unused(self):
@@ -203,19 +206,25 @@ class Test_TestCase(_TestCase):
         class CoroutineFunctionTest(asynctest.TestCase):
             ran = False
 
+            async def noop(self):
+                pass
+
             @asyncio.coroutine
             def runTest(self):
                 self.ran = True
-                yield from []
+                yield from self.noop()
 
-        cases = [CoroutineFunctionTest()]
-        if _using_await:
-            cases.append(_using_await.CoroutineFunctionTest())
+        class NativeCoroutineFunctionTest(CoroutineFunctionTest):
+            async def runTest(self):
+                self.ran = True
+                await self.noop()
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in cases:
+                for case in (CoroutineFunctionTest(),
+                             NativeCoroutineFunctionTest()):
                     with self.subTest(case=case):
+                        case.ran = False
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
@@ -223,17 +232,25 @@ class Test_TestCase(_TestCase):
         class CoroutineTest(asynctest.TestCase):
             ran = False
 
-            def runTest(self):
-                return asyncio.coroutine(lambda: setattr(self, 'ran', True))()
+            @asyncio.coroutine
+            def set_ran(self):
+                self.ran = True
 
-        cases = [CoroutineTest()]
-        if _using_await:
-            cases.append(_using_await.CoroutineTest())
+            def runTest(self):
+                return self.set_ran()
+
+        class NativeCoroutineTest(CoroutineTest):
+            async def set_ran(self):
+                self.ran = True
+
+            def runTest(self):
+                return self.set_ran()
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in cases:
+                for case in (CoroutineTest(), NativeCoroutineTest()):
                     with self.subTest(case=case):
+                        case.ran = False
                         getattr(case, method)()
                         self.assertTrue(case.ran)
 
@@ -376,10 +393,11 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
 
 
 class Test_ClockedTestCase(asynctest.ClockedTestCase):
-    took_n_seconds = re.compile('took \d+\.\d{3} seconds')
+    took_n_seconds = re.compile(r'took \d+\.\d{3} seconds')
 
     @asyncio.coroutine
     def advance(self, seconds):
+        debug = self.loop.get_debug()
         try:
             self.loop.set_debug(True)
             with self.assertLogs(level=logging.WARNING) as log:
@@ -388,7 +406,7 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
             self.assertTrue(any(filter(self.took_n_seconds.search,
                                        log.output)))
         finally:
-            self.loop.set_debug(False)
+            self.loop.set_debug(debug)
 
     @asyncio.coroutine
     def test_advance(self):
@@ -449,7 +467,11 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
 
 class Test_ClockedTestCase_setUp(asynctest.ClockedTestCase):
     def setUp(self):
-        pass
+        # Deactivate debug mode if enabled, because it will warn us that the
+        # advance() coroutine took 1s.
+        debug = self.loop.get_debug()
+        self.loop.set_debug(False)
+        self.addCleanup(self.loop.set_debug, debug)
 
     @asyncio.coroutine
     def test_setUp(self):
@@ -460,6 +482,12 @@ class Test_ClockedTestCase_setUp(asynctest.ClockedTestCase):
 class Test_ClockedTestCase_async_setUp(asynctest.ClockedTestCase):
     @asyncio.coroutine
     def setUp(self):
+        # Deactivate debug mode if enabled, because it will warn us that the
+        # advance() coroutine took 1s.
+        debug = self.loop.get_debug()
+        self.loop.set_debug(False)
+        self.addCleanup(self.loop.set_debug, debug)
+
         yield from self.advance(1)
 
     @asyncio.coroutine

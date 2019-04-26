@@ -21,42 +21,6 @@ import types
 import unittest.mock
 
 
-if sys.version_info >= (3, 5):
-    from . import _awaitable
-
-    async_magic_coroutines = ("__aenter__", "__aexit__", "__anext__")
-    _async_magics = async_magic_coroutines + ("__aiter__", )
-
-    async_magic_coroutines = set(async_magic_coroutines)
-    _async_magics = set(_async_magics)
-
-    # We use unittest.mock.MagicProxy which works well, but it's not aware that
-    # we want __aexit__ to return a falsy value by default.
-    # We add the entry in unittest internal dict as it will not change the
-    # normal behavior of unittest.
-    unittest.mock._return_values["__aexit__"] = False
-
-    def _get_async_iter(mock):
-        def __aiter__():
-            return_value = mock.__aiter__._mock_return_value
-            if return_value is DEFAULT:
-                iterator = iter([])
-            else:
-                iterator = iter(return_value)
-
-            return _awaitable.AsyncIterator(iterator)
-
-        if asyncio.iscoroutinefunction(mock.__aiter__):
-            return asyncio.coroutine(__aiter__)
-
-        return __aiter__
-
-    unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
-    unittest.mock._all_magics |= _async_magics
-else:
-    _awaitable = None
-    async_magic_coroutines = _async_magics = set()
-
 # From python 3.6, a sentinel object is used to mark coroutines (rather than
 # a boolean) to prevent a mock/proxy object to return a truthy value.
 # see: https://github.com/python/asyncio/commit/ea776a11f632a975ad3ebbb07d8981804aa292db
@@ -66,15 +30,91 @@ except AttributeError:
     _is_coroutine = True
 
 
-try:
-    # Python 3.5+
-    _isawaitable = inspect.isawaitable
-except AttributeError:
-    _isawaitable = asyncio.iscoroutine
+class _AsyncIterator:
+    """
+    Wraps an iterator in an asynchronous iterator.
+    """
+    def __init__(self, iterator):
+        self.iterator = iterator
 
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self.iterator)
+        except StopIteration:
+            pass
+        raise StopAsyncIteration
+
+
+# magic methods which must be coroutine functions
+async_magic_coroutines = ("__aenter__", "__aexit__", "__anext__")
+# all magic methods used in an async context
+_async_magics = async_magic_coroutines + ("__aiter__", )
+
+# We use unittest.mock.MagicProxy which works well, but it's not aware that
+# we want __aexit__ to return a falsy value by default.
+# We add the entry in unittest internal dict as it will not change the
+# normal behavior of unittest.
+unittest.mock._return_values["__aexit__"] = False
+
+
+def _get_async_iter(mock):
+    """
+    Factory of ``__aiter__`` magic methods for a MagicMock.
+
+    It creates a function which returns an asynchronous iterator based on the
+    return value of ``mock.__aiter__``.
+
+    Since __aiter__ used could be a coroutine in Python 3.5 and 3.6, we also
+    support this case.
+
+    See: https://www.python.org/dev/peps/pep-0525/#id23
+    """
+    def __aiter__():
+        return_value = mock.__aiter__._mock_return_value
+        if return_value is DEFAULT:
+            iterator = iter([])
+        else:
+            iterator = iter(return_value)
+
+        return _AsyncIterator(iterator)
+
+    if asyncio.iscoroutinefunction(mock.__aiter__):
+        return asyncio.coroutine(__aiter__)
+
+    return __aiter__
+
+
+unittest.mock._side_effect_methods["__aiter__"] = _get_async_iter
+
+
+async_magic_coroutines = set(async_magic_coroutines)
+_async_magics = set(_async_magics)
+
+# This changes the behavior of unittest, but the change is minor and is
+# probably better than overriding __set/get/del attr__ everywhere.
+unittest.mock._all_magics |= _async_magics
 
 def _raise(exception):
     raise exception
+
+
+def _make_native_coroutine(coroutine):
+    """
+    Wrap a coroutine (or any function returning an awaitable) in a native
+    coroutine.
+    """
+    if inspect.iscoroutinefunction(coroutine):
+        # Nothing to do.
+        return coroutine
+
+    @functools.wraps(coroutine)
+    async def wrapper(*args, **kwargs):
+        return await coroutine(*args, **kwargs)
+
+    return wrapper
 
 
 def _is_started(patching):
@@ -558,7 +598,7 @@ class CoroutineMock(Mock):
         @asyncio.coroutine
         def proxy():
             try:
-                if _isawaitable(result):
+                if inspect.isawaitable(result):
                     return (yield from result)
                 else:
                     return result
@@ -949,11 +989,11 @@ def _decorate_coroutine_callable(func, new_patching):
             for patching in reversed(patchers_to_exit):
                 patching.__exit__(*exc_info)
 
-    # wrap the factory in a native coroutine  or a generator to respect
+    # wrap the factory in a native coroutine or a generator to respect
     # introspection.
     if is_native_coroutine_func:
         # inspect.iscoroutinefunction() returns True
-        patched = _awaitable.make_native_coroutine(patched_factory)
+        patched = _make_native_coroutine(patched_factory)
     elif is_generator_func:
         # inspect.isgeneratorfunction() returns True
         def patched_generator(*args, **kwargs):
