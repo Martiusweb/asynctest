@@ -32,9 +32,15 @@
     Patch
     ~~~~~
 
-    .. autodata:: GLOBAL
+    .. data:: GLOBAL
 
-    .. autodata:: LIMITED
+       Value of ``scope``, activating a patch until the decorated generator or
+       coroutine returns or raises an exception.
+
+    .. data:: LIMITED
+
+       Value of ``scope``, deactivating a patch when a decorated generator or a
+       coroutine pauses (``yield`` or ``await``).
 
     .. autofunction:: patch
 

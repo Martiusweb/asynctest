@@ -912,14 +912,9 @@ def _update_new_callable(patcher, new, new_callable):
     return patcher
 
 
+# Documented in doc/asynctest.mock.rst
 PatchScope = enum.Enum('PatchScope', 'LIMITED GLOBAL')
-
-#: Value of ``scope``, deactivating a patch when a decorated generator or
-#: a coroutine pauses (``yield`` or ``await``).
 LIMITED = PatchScope.LIMITED
-
-#: Value of ``scope``, activating a patch until the decorated generator or
-#: coroutine returns or raises an exception.
 GLOBAL = PatchScope.GLOBAL
 
 
