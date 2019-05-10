@@ -45,7 +45,7 @@ set-up and tear down.
 import asyncio
 import functools
 import types
-import unittest.case
+import unittest
 import sys
 import warnings
 
@@ -116,7 +116,7 @@ class _Policy(asyncio.AbstractEventLoopPolicy):
             self.original_policy.set_child_watcher(None)
 
 
-class TestCase(unittest.case.TestCase):
+class TestCase(unittest.TestCase):
     """
     A test which is a coroutine function or which returns a coroutine will run
     on the loop.
