@@ -24,6 +24,10 @@ cuts down boilerplate code when testing libraries for asyncio.
 Currently, asynctest targets the "selector" model, hence, some features
 will not (yet?) work with Windows' proactor.
 
+.. warning::
+
+   Since asynctest 0.13, Python 3.4 is not supported anymore.
+
 Author & license
 ----------------
 
