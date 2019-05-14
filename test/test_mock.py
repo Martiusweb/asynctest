@@ -1075,6 +1075,62 @@ class Test_patch_decorator_coroutine_or_generator(unittest.TestCase):
 
             run_coroutine(tester(a_native_coroutine))
 
+    def test_mock_on_patched_coroutine_is_a_new_mock_for_each_call(self):
+        # See bug #121
+        issued_mocks = set()
+
+
+        with self.subTest("old style coroutine"):
+            @asynctest.mock.patch("test.test_mock.Test")
+            @asyncio.coroutine
+            def store_mock_from_patch(mock):
+                issued_mocks.add(mock)
+
+            run_coroutine(store_mock_from_patch())
+            run_coroutine(store_mock_from_patch())
+
+            self.assertEqual(2, len(issued_mocks))
+
+        issued_mocks.clear()
+
+        with self.subTest("native coroutine"):
+            @asynctest.mock.patch("test.test_mock.Test")
+            async def store_mock_from_patch(mock):
+                issued_mocks.add(mock)
+
+            run_coroutine(store_mock_from_patch())
+            run_coroutine(store_mock_from_patch())
+
+            self.assertEqual(2, len(issued_mocks))
+
+    def test_concurrent_patches_dont_affect_each_other(self):
+        with self.subTest("old style coroutine"):
+            @asynctest.patch("test.test_mock.Test")
+            @asyncio.coroutine
+            def test_patch(recursive, *_):
+                before = Test
+
+                if recursive:
+                    yield from test_patch(False)
+
+                # mock must still apply
+                self.assertEqual(before, Test)
+
+            run_coroutine(test_patch(True))
+
+        with self.subTest("native coroutine"):
+            @asynctest.patch("test.test_mock.Test")
+            async def test_patch_native(recursive, *_):
+                before = Test
+
+                if recursive:
+                    await test_patch_native(False)
+
+                # mock must still apply
+                self.assertEqual(before, Test)
+
+            run_coroutine(test_patch(True))
+
 
 class Test_patch_object(unittest.TestCase):
     def test_patch_with_MagicMock(self):
@@ -1198,6 +1254,31 @@ class Test_patch_dict(unittest.TestCase):
         self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
         self.assertTrue(run_coroutine(instance.test_a_coroutine()))
         self.assertFalse(test.test_mock.Test().a_dict['is_patched'])
+
+    def test_patch_decorates_concurrent_coroutines(self):
+        # See bug #121
+        with self.subTest("old style coroutine"):
+            @patch_dict_is_patched()
+            @asyncio.coroutine
+            def a_coroutine(recursive):
+                import test.test_mock
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+                if recursive:
+                    yield from a_coroutine(False)
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+
+            run_coroutine(a_coroutine(True))
+
+        with self.subTest("native coroutine"):
+            @patch_dict_is_patched()
+            async def a_native_coroutine(recursive):
+                import test.test_mock
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+                if recursive:
+                    await a_native_coroutine(False)
+                self.assertTrue(test.test_mock.Test().a_dict['is_patched'])
+
+            run_coroutine(a_native_coroutine(True))
 
 
 class Test_patch_autospec(unittest.TestCase):
