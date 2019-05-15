@@ -24,9 +24,16 @@ cuts down boilerplate code when testing libraries for asyncio.
 Currently, asynctest targets the "selector" model, hence, some features
 will not (yet?) work with Windows' proactor.
 
-.. warning::
+⚠️  Warning: **changes in 0.13**
 
-   Since asynctest 0.13, Python 3.4 is not supported anymore.
+Since asynctest 0.13, some major changes may impact you:
+
+* Python 3.4 is not supported anymore: importing asynctest will raise a syntax
+  error.
+* ``@patch`` decorators used to re-use the mock object for each call of the
+  coroutine, which is inconsistent with the behavior of ``@unittest.patch``.
+  See `issue #121 <https://github.com/Martiusweb/asynctest/issues/121>`_ for
+  the details.
 
 Author & license
 ----------------
