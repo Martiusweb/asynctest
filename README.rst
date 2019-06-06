@@ -41,6 +41,8 @@ Author & license
 Authored by Martin Richard <martius@martiusweb.net> and licensed under the
 Apache 2 license.
 
+   Copyright 2019 Martin Richard
+
 See the AUTHORS file for a comprehensive list of the authors.
 
 Documentation
