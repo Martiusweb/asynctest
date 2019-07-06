@@ -55,6 +55,20 @@ if ssl:
                                   ssl.SSLSocket)
 
 
+def _mock_register(selector, key):
+    def register(fileobj, events, data=None):
+        selector.get_map.return_value[key.fd] = key
+        return key
+    return register
+
+
+def _mock_unregister(selector, key):
+    def unregister(fileobj):
+        del selector.get_map.return_value[key.fd]
+        return key
+    return unregister
+
+
 def selector_subtest(method):
     @functools.wraps(method)
     def wrapper(self):
@@ -63,6 +77,7 @@ def selector_subtest(method):
 
         with self.subTest(test='with_selector'):
             mock = unittest.mock.Mock(selectors.BaseSelector)
+            mock.get_map.return_value = {}
             method(self, asynctest.selector.TestSelector(mock), mock)
 
     return wrapper
@@ -83,9 +98,10 @@ class Test_TestSelector(Selector_TestCase):
     def test_register_fileno(self, selector, selector_mock):
         with open(os.devnull, 'r') as devnull:
             if selector_mock:
-                selector_mock.register.return_value = selectors.SelectorKey(
+                returned_key = selectors.SelectorKey(
                     devnull, devnull.fileno(), selectors.EVENT_READ, "data"
                 )
+                selector_mock.register.side_effect = _mock_register(selector_mock, returned_key)
 
             key = selector.register(devnull, selectors.EVENT_READ, "data")
 
@@ -115,8 +131,8 @@ class Test_TestSelector(Selector_TestCase):
             if selector_mock:
                 key = selectors.SelectorKey(devnull, devnull.fileno(),
                                             selectors.EVENT_READ, "data")
-                selector_mock.register.return_value = key
-                selector_mock.unregister.return_value = key
+                selector_mock.register.side_effect = _mock_register(selector_mock, key)
+                selector_mock.unregister.side_effect = _mock_unregister(selector_mock, key)
 
             selector.register(devnull, selectors.EVENT_READ, "data")
 
@@ -144,9 +160,10 @@ class Test_TestSelector(Selector_TestCase):
     def test_modify_fileno(self, selector, selector_mock):
         with open(os.devnull, 'r') as devnull:
             if selector_mock:
-                selector_mock.modify.return_value = selectors.SelectorKey(
+                returned_key = selectors.SelectorKey(
                     devnull, devnull.fileno(), selectors.EVENT_READ, "data2"
                 )
+                selector_mock.modify.side_effect = _mock_register(selector_mock, returned_key)
 
             original_key = selector.register(devnull, selectors.EVENT_READ, "data")
             # modify may update the original key, keep a copy
@@ -165,9 +182,8 @@ class Test_TestSelector(Selector_TestCase):
         fd = 1
 
         if selector_mock:
-            selector_mock.modify.return_value = selectors.SelectorKey(
-                fd, fd, selectors.EVENT_READ, "data2"
-            )
+            returned_key = selectors.SelectorKey(fd, fd, selectors.EVENT_READ, "data2")
+            selector_mock.modify.side_effect = _mock_register(selector_mock, returned_key)
 
         original_key = selector.register(fd, selectors.EVENT_READ, "data")
         original_key = copy.copy(original_key)
