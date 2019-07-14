@@ -139,17 +139,22 @@ class _Test_subclass:
 
 
 @inject_class
-class _Test_called_coroutine:
+class _Test_called_coroutine(asynctest.TestCase):
     # Ensure that an object mocking as a coroutine works
-    def test_returns_coroutine(self, klass):
+    async def test_returns_coroutine(self, klass):
         mock = klass()
 
         coro = mock()
-        # Suppress debug warning about non-running coroutine
-        if isinstance(coro, asyncio.coroutines.CoroWrapper):
-            coro.gen = None
 
-        self.assertTrue(asyncio.iscoroutine(coro))
+        try:
+            # Suppress debug warning about non-running coroutine
+            if isinstance(coro, asyncio.coroutines.CoroWrapper):
+                coro.gen = None
+
+            self.assertTrue(asyncio.iscoroutine(coro))
+        finally:
+            # Prevent runtime warning
+            await coro
 
     def test_returns_coroutine_from_return_value(self, klass):
         mock = klass()
@@ -769,11 +774,11 @@ class Test_CoroutineMock_awaited(asynctest.TestCase):
         with self.assertRaises(AssertionError):
             mock.assert_not_awaited()
 
-    def test_create_autospec_on_coroutine_and_using_assert_methods(self):
+    async def test_create_autospec_on_coroutine_and_using_assert_methods(self):
         mock = asynctest.create_autospec(Test.a_coroutine_with_args)
         mock.assert_not_awaited()
 
-        yield from mock("arg0", "arg1", "arg2")
+        await mock("arg0", "arg1", "arg2")
         mock.assert_awaited()  # calls assert not awaited
         mock.assert_awaited_once()
         mock.assert_awaited_with("arg0", "arg1", "arg2")
