@@ -77,7 +77,7 @@ def selector_subtest(method):
 
         with self.subTest(test='with_selector'):
             mock = unittest.mock.Mock(selectors.BaseSelector)
-            mock.get_map.return_value = {}
+            mock.get_map.return_value = mock._fd_to_key = {}
             method(self, asynctest.selector.TestSelector(mock), mock)
 
     return wrapper

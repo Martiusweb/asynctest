@@ -217,8 +217,10 @@ class TestSelector(selectors._BaseSelectorImpl):
     def __init__(self, selector=None):
         super().__init__()
         self._selector = selector
+
         if selector is not None:
-            self._fd_to_key = collections.ChainMap({}, selector.get_map())
+            self._fd_to_key = collections.ChainMap(self._fd_to_key,
+                                                   selector.get_map())
 
     def _fileobj_lookup(self, fileobj):
         if isfilemock(fileobj):
