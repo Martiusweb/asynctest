@@ -43,6 +43,16 @@ Apache 2 license.
 
    Copyright 2019 Martin Richard
 
+
+In addition, permission is explicitly granted to Python contributors to use,
+copy, modify, (...) the code and documentation of asynctest for any project of
+the Python Software Foundation. This gives the PSF the irrevocable and
+perpetual rights that the PSD claims in its CLA.
+
+This means that by contributing to asynctest, you agree that these
+contributions may be included in any project of the Python Software Foundation,
+and can be subject to re-licensing under the Python Software License.
+
 See the AUTHORS file for a comprehensive list of the authors.
 
 Documentation
