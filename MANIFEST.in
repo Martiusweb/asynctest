@@ -1,4 +1,8 @@
-include LICENSE.md
+include LICENSE
 include README.rst
 include test/__init__.py
+include test/test_case.py
+include test/test_helpers.py
+include test/test_mock.py
+include test/test_selector.py
 include test/utils.py
