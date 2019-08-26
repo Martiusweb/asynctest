@@ -61,7 +61,7 @@ Instead, it should be:
      * ``client.get_users()`` will return an empty result,
      * and that the cache is empty,
 
-   a call to ``cache_users()`` *must have queried the client* and must leaves
+   a call to ``cache_users()`` *must have queried the client* and must leave
    the cache empty.
 
 Mocks solve both of the issues discussed above. A mock can be configured to act
@@ -89,7 +89,7 @@ called. ``client.increase_nb_users_cached.assert_called_once_with(1)`` verifies
 that this method has been called, and that the right arguments have been
 provided.
 
-Mocks are powerful and can be configured in many ways. Unfortunatly, they can
+Mocks are powerful and can be configured in many ways. Unfortunately, they can
 be somewhat complex to use.
 
 The next sections of this chapter will present the features of
