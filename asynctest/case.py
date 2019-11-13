@@ -383,6 +383,11 @@ class TestCase(unittest.TestCase):
         Test that an exception of type ``exception`` is raised when an
         exception is raised when awaiting ``awaitable``, a future or coroutine.
 
+        Unlike :meth:`unittest.TestCase.assertRaises()`, it does not accept
+        extra arguments, and should be awaited::
+
+            await assertAsyncRaises(Exception, load_url("http://thing.com"))
+
         :see: :meth:`unittest.TestCase.assertRaises()`
         """
         with self.assertRaises(exception):
