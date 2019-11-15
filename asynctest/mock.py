@@ -72,7 +72,7 @@ def _get_async_iter(mock):
 
     See: https://www.python.org/dev/peps/pep-0525/#id23
     """
-    def __aiter__():
+    def callback():
         return_value = mock.__aiter__._mock_return_value
         if return_value is DEFAULT:
             iterator = iter([])
@@ -82,7 +82,11 @@ def _get_async_iter(mock):
         return _AsyncIterator(iterator)
 
     if asyncio.iscoroutinefunction(mock.__aiter__):
-        return asyncio.coroutine(__aiter__)
+        async def __aiter__():
+            return await callback()
+    else:
+        def __aiter__():
+            return callback()
 
     return __aiter__
 
@@ -369,8 +373,7 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     For instance:
 
     >>> class Foo:
-    ...     @asyncio.coroutine
-    ...     def foo(self):
+    ...     async def foo(self):
     ...         pass
     ...
     ...     def bar(self):
@@ -430,8 +433,7 @@ class _AwaitEvent:
         self._mock = mock
         self._condition = None
 
-    @asyncio.coroutine
-    def wait(self, skip=0):
+    async def wait(self, skip=0):
         """
         Wait for await.
 
@@ -442,10 +444,9 @@ class _AwaitEvent:
         def predicate(mock):
             return mock.await_count > skip
 
-        return (yield from self.wait_for(predicate))
+        return await self.wait_for(predicate)
 
-    @asyncio.coroutine
-    def wait_next(self, skip=0):
+    async def wait_next(self, skip=0):
         """
         Wait for the next await.
 
@@ -462,10 +463,9 @@ class _AwaitEvent:
         def predicate(mock):
             return mock.await_count > await_count + skip
 
-        return (yield from self.wait_for(predicate))
+        return await self.wait_for(predicate)
 
-    @asyncio.coroutine
-    def wait_for(self, predicate):
+    async def wait_for(self, predicate):
         """
         Wait for a given predicate to become True.
 
@@ -476,21 +476,20 @@ class _AwaitEvent:
         condition = self._get_condition()
 
         try:
-            yield from condition.acquire()
+            await condition.acquire()
 
             def _predicate():
                 return predicate(self._mock)
 
-            return (yield from condition.wait_for(_predicate))
+            return await condition.wait_for(_predicate)
         finally:
             condition.release()
 
-    @asyncio.coroutine
-    def _notify(self):
+    async def _notify(self):
         condition = self._get_condition()
 
         try:
-            yield from condition.acquire()
+            await condition.acquire()
             condition.notify_all()
         finally:
             condition.release()
@@ -582,6 +581,13 @@ class CoroutineMock(Mock):
         self.__dict__['_mock_await_args_list'] = unittest.mock._CallList()
 
     def _mock_call(_mock_self, *args, **kwargs):
+        """Note:
+            This will return a coroutine that must be awaited. Not awaiting it
+            will result in a :class:`RuntimeWarning`_.
+        """
+        async def handle_error(error):
+            return await _raise(error)
+
         try:
             result = super()._mock_call(*args, **kwargs)
         except StopIteration as e:
@@ -589,24 +595,23 @@ class CoroutineMock(Mock):
             if side_effect is not None and not callable(side_effect):
                 raise
 
-            result = asyncio.coroutine(_raise)(e)
+            result = handle_error(e)
         except BaseException as e:
-            result = asyncio.coroutine(_raise)(e)
+            result = handle_error(e)
 
         _call = _mock_self.call_args
 
-        @asyncio.coroutine
-        def proxy():
+        async def proxy():
             try:
                 if inspect.isawaitable(result):
-                    return (yield from result)
+                    return await result
                 else:
                     return result
             finally:
                 _mock_self.await_count += 1
                 _mock_self.await_args = _call
                 _mock_self.await_args_list.append(_call)
-                yield from _mock_self.awaited._notify()
+                await _mock_self.awaited._notify()
 
         return proxy()
 
@@ -1005,7 +1010,9 @@ def _decorate_coroutine_callable(func, new_patching):
 
         if is_coroutine_func:
             # asyncio.iscoroutinefunction() returns True
-            patched = asyncio.coroutine(patched)
+            async def async_patched(*args, **kwargs):
+                return patched(*args, **kwargs)
+
     else:
         patched = patched_factory
 
