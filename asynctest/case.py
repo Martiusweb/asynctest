@@ -44,6 +44,7 @@ set-up and tear down.
 
 import asyncio
 import functools
+import os
 import types
 import unittest
 import sys
@@ -183,6 +184,35 @@ class TestCase(unittest.TestCase):
 
     #: Event loop created and set as default event loop during the test.
     loop = None
+
+    #: Default timeout for the :meth:`~asynctest.TestCase.with_timeout` decorator.
+    #: The :envvar:`ASYNCTEST_TIMEOUT` environment variable can be used to override default.
+    default_timeout = 1.0
+
+    @classmethod
+    def with_timeout(cls, timeout=None):
+        """
+        Raise :exc:`asyncio.TimeoutError` if decorated coroutine does not finish
+        within specified timeout.
+
+        :param timeout: Timeout for the wrapped coroutine.
+
+        :see: :attr:`~asynctest.TestCase.default_timeout`
+        """
+        def decorator(coro):
+            @functools.wraps(coro)
+            @asyncio.coroutine
+            def wrapper(self, *args, **kwargs):
+                nonlocal timeout
+
+                if timeout is None:
+                    timeout = float(os.environ.get('ASYNCTEST_TIMEOUT', self.default_timeout))
+
+                return (yield from asyncio.wait_for(coro(self, *args, **kwargs), timeout=timeout))
+
+            return wrapper
+
+        return decorator
 
     def _init_loop(self):
         if self.use_default_loop:
