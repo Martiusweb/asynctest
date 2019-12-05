@@ -347,6 +347,13 @@ class TestCase(unittest.TestCase):
             self._unset_loop()
 
     def _run_test_method(self, method):
+        # If the coroutine is decorated by hypothesis wrap
+        # it before running.
+        if getattr(method, "is_hypothesis_test", False) and asyncio.iscoroutinefunction(
+            method.hypothesis.inner_test
+        ):
+            method.hypothesis.inner_test = wrap_in_sync(method.hypothesis.inner_test)
+
         # If the method is a coroutine or returns a coroutine, run it on the
         # loop
         result = method()
@@ -508,3 +515,25 @@ def ignore_loop(func=None):
                   "fail_on(unused_loop=False)", DeprecationWarning)
     checker = asynctest._fail_on._fail_on({"unused_loop": False})
     return checker if func is None else checker(func)
+
+
+def wrap_in_sync(func):
+    """Return a sync wrapper around an async function executing it in the
+    current event loop.
+    """
+
+    @functools.wraps(func)
+    def inner(**kwargs):
+        coro = func(**kwargs)
+        if coro is not None:
+            task = asyncio.ensure_future(coro)
+            try:
+                asyncio.get_event_loop().run_until_complete(task)
+            except BaseException:
+                # run_until_complete doesn't get the result from exceptions
+                # that are not subclasses of `Exception`. Consume all
+                # exceptions to prevent asyncio's warning from logging.
+                if task.done() and not task.cancelled():
+                    task.exception()
+                raise
+    return inner

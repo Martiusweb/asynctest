@@ -130,7 +130,7 @@ matrix:
 
 install:
 - curl https://bootstrap.pypa.io/get-pip.py | python
-- python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0
+- python -m pip install --upgrade wheel>=0.30.0 setuptools>=36.6.0 hypothesis>=3.64
 
 script:
 - python -m unittest --verbose test
