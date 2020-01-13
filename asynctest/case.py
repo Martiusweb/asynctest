@@ -44,6 +44,7 @@ set-up and tear down.
 
 import asyncio
 import functools
+import traceback
 import types
 import unittest
 import sys
@@ -197,6 +198,15 @@ class TestCase(unittest.TestCase):
         asyncio.set_event_loop_policy(policy)
 
         self.loop = self._patch_loop(self.loop)
+        self.unhandled_exceptions = {}  # type Dict[int, Tuple[Union[str, BaseException], Optional[TracebackType]]
+
+        if hasattr(loop, 'get_exception_handler'):
+            # Python 3.5.2+
+            self._original_exception_handler = self.loop.get_exception_handler() or self.loop.default_exception_handler
+        else:
+            self._original_exception_handler = self.loop.default_exception_handler
+
+        self.loop.set_exception_handler(self._loop_exception_handler)
 
     def _unset_loop(self):
         policy = asyncio.get_event_loop_policy()
@@ -234,6 +244,13 @@ class TestCase(unittest.TestCase):
             loop._selector = asynctest.selector.TestSelector(loop._selector)
 
         return loop
+
+    def _loop_exception_handler(self, loop, context):
+        if context.get('future') and context.get('exception'):
+            future_id = id(context['future'])
+            future_exc = context['exception']
+            future_tb = context.get('source_traceback')
+            self.unhandled_exceptions[future_id] = (future_exc, future_tb)
 
     def _setUp(self):
         self._init_loop()
