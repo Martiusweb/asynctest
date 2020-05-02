@@ -1,5 +1,5 @@
 # coding: utf-8
-# pylama: ignore=E501 noqa
+# pylama: ignore=E501,C0103 noqa
 
 import asyncio
 import itertools
@@ -11,11 +11,13 @@ import sys
 import time
 import unittest
 import unittest.mock
+import warnings
 
 import asynctest
 
 
 class Test:
+    # pylint: disable=R0903
     class FooTestCase(asynctest.TestCase):
         def runTest(self):
             pass
@@ -23,40 +25,21 @@ class Test:
         def test_foo(self):
             pass
 
-    @asynctest.fail_on(unused_loop=False)
-    class LoggingTestCase(asynctest.TestCase):
-        def __init__(self, calls):
-            super().__init__()
-            self.calls = calls
-
-        def setUp(self):
-            self.calls.append('setUp')
-
-        def test_basic(self):
-            self.events.append('test_basic')
-
-        def tearDown(self):
-            self.events.append('tearDown')
-
     class StartWaitProcessTestCase(asynctest.TestCase):
         @staticmethod
-        @asyncio.coroutine
-        def start_wait_process(loop):
-            process = yield from asyncio.create_subprocess_shell(
-                "true", stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                loop=loop)
+        async def start_wait_process():
+            process = await asyncio.create_subprocess_shell(
+                "true", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
             try:
-                out, err = yield from asyncio.wait_for(
-                    process.communicate(), timeout=.1, loop=loop)
+                await asyncio.wait_for(process.communicate(), timeout=.1)
             except BaseException:
                 process.kill()
                 os.waitpid(process.pid, os.WNOHANG)
                 raise
 
-        @asyncio.coroutine
-        def runTest(self):
-            yield from self.start_wait_process(self.loop)
+        async def runTest(self):
+            await self.start_wait_process()
 
 
 class _TestCase(unittest.TestCase):
@@ -209,37 +192,21 @@ class Test_TestCase(_TestCase):
             async def noop(self):
                 pass
 
-            @asyncio.coroutine
-            def runTest(self):
-                self.ran = True
-                yield from self.noop()
-
-        class NativeCoroutineFunctionTest(CoroutineFunctionTest):
             async def runTest(self):
                 self.ran = True
                 await self.noop()
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in (CoroutineFunctionTest(),
-                             NativeCoroutineFunctionTest()):
-                    with self.subTest(case=case):
-                        case.ran = False
-                        getattr(case, method)()
-                        self.assertTrue(case.ran)
+                case = CoroutineFunctionTest()
+                case.ran = False
+                getattr(case, method)()
+                self.assertTrue(case.ran)
 
     def test_coroutine_returned_executed(self):
         class CoroutineTest(asynctest.TestCase):
             ran = False
 
-            @asyncio.coroutine
-            def set_ran(self):
-                self.ran = True
-
-            def runTest(self):
-                return self.set_ran()
-
-        class NativeCoroutineTest(CoroutineTest):
             async def set_ran(self):
                 self.ran = True
 
@@ -248,21 +215,21 @@ class Test_TestCase(_TestCase):
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                for case in (CoroutineTest(), NativeCoroutineTest()):
-                    with self.subTest(case=case):
-                        case.ran = False
-                        getattr(case, method)()
-                        self.assertTrue(case.ran)
+                case = CoroutineTest()
+                case.ran = False
+                getattr(case, method)()
+                self.assertTrue(case.ran)
 
     def test_fails_when_future_has_scheduled_calls(self):
         class CruftyTest(asynctest.TestCase):
             @asynctest.fail_on(active_handles=True, unused_loop=False)
-            def runTest(instance):
-                instance.loop.call_later(5, lambda: None)
+            def runTest(self):
+                self.loop.call_later(5, lambda: None)
 
         with self.subTest(method='debug'):
             with self.assertRaisesRegex(AssertionError, 'unfinished work'):
                 CruftyTest().debug()
+
         with self.subTest(method='run'):
             result = CruftyTest().run()
             self.assertEqual(1, len(result.failures))
@@ -279,8 +246,7 @@ class Test_TestCase(_TestCase):
         class WithSetupCoroutine(Test.FooTestCase):
             ran = False
 
-            @asyncio.coroutine
-            def setUp(self):
+            async def setUp(self):
                 WithSetupCoroutine.ran = True
 
         @asynctest.fail_on(unused_loop=False)
@@ -294,7 +260,7 @@ class Test_TestCase(_TestCase):
         class WithTearDownCoroutine(Test.FooTestCase):
             ran = False
 
-            def tearDown(self):
+            async def tearDown(self):
                 WithTearDownCoroutine.ran = True
 
         for method in self.run_methods:
@@ -316,8 +282,7 @@ class Test_TestCase(_TestCase):
             nonlocal cleanup_normal_called
             cleanup_normal_called = True
 
-        @asyncio.coroutine
-        def cleanup_coro():
+        async def cleanup_coro():
             nonlocal cleanup_coro_called
             cleanup_coro_called = True
 
@@ -341,6 +306,8 @@ class Test_TestCase(_TestCase):
                 self.assertTrue(cleanup_coro_called)
 
     def test_loop_uses_TestSelector(self):
+        # pylint: disable=W0212
+
         @asynctest.fail_on(unused_loop=False)
         class CheckLoopTest(asynctest.TestCase):
             def runTest(self):
@@ -377,8 +344,7 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
         # check if we can spawn and wait a subprocess before an after a test
         for method in self.run_methods:
             with self.subTest(method=method):
-                coro = Test.StartWaitProcessTestCase.start_wait_process(
-                    default_loop)
+                coro = Test.StartWaitProcessTestCase.start_wait_process()
                 default_loop.run_until_complete(coro)
 
                 case = Test.StartWaitProcessTestCase()
@@ -387,29 +353,26 @@ class Test_TestCase_and_ChildWatcher(_TestCase):
                 if outcome:
                     self.assertTrue(outcome.wasSuccessful())
 
-                coro = Test.StartWaitProcessTestCase.start_wait_process(
-                    default_loop)
+                coro = Test.StartWaitProcessTestCase.start_wait_process()
                 default_loop.run_until_complete(coro)
 
 
 class Test_ClockedTestCase(asynctest.ClockedTestCase):
     took_n_seconds = re.compile(r'took \d+\.\d{3} seconds')
 
-    @asyncio.coroutine
-    def advance(self, seconds):
+    async def advance(self, seconds):
         debug = self.loop.get_debug()
         try:
             self.loop.set_debug(True)
             with self.assertLogs(level=logging.WARNING) as log:
-                yield from self.loop.create_task(super().advance(seconds))
+                await self.loop.create_task(super().advance(seconds))
 
             self.assertTrue(any(filter(self.took_n_seconds.search,
                                        log.output)))
         finally:
             self.loop.set_debug(debug)
 
-    @asyncio.coroutine
-    def test_advance(self):
+    async def test_advance(self):
         f = asyncio.Future(loop=self.loop)
         g = asyncio.Future(loop=self.loop)
         started_wall_clock = time.monotonic()
@@ -417,10 +380,10 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.loop.call_later(1, f.set_result, None)
         self.loop.call_later(2, g.set_result, None)
         self.assertFalse(f.done())
-        yield from self.advance(1)
+        await self.advance(1)
         self.assertTrue(f.done())
         self.assertFalse(g.done())
-        yield from self.advance(9)
+        await self.advance(9)
         self.assertTrue(g)
         finished_wall_clock = time.monotonic()
         finished_loop_clock = self.loop.time()
@@ -441,14 +404,12 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
             finished_wall_clock - started_wall_clock,
             finished_loop_clock - started_loop_clock)
 
-    @asyncio.coroutine
-    def test_negative_advance(self):
+    async def test_negative_advance(self):
         with self.assertRaisesRegex(ValueError, 'back in time'):
-            yield from self.advance(-1)
+            await self.advance(-1)
         self.assertEqual(self.loop.time(), 0)
 
-    @asyncio.coroutine
-    def test_callbacks_are_called_on_time(self):
+    async def test_callbacks_are_called_on_time(self):
         def record(call_time):
             call_time.append(self.loop.time())
 
@@ -457,10 +418,10 @@ class Test_ClockedTestCase(asynctest.ClockedTestCase):
         self.loop.call_later(1, record, call_time)
         self.loop.call_later(2, record, call_time)
         self.loop.call_later(5, record, call_time)
-        yield from self.advance(3)
+        await self.advance(3)
         expected = list(range(3))
         self.assertEqual(call_time, expected)
-        yield from self.advance(2)
+        await self.advance(2)
         expected.append(5)
         self.assertEqual(call_time, expected)
 
@@ -473,25 +434,22 @@ class Test_ClockedTestCase_setUp(asynctest.ClockedTestCase):
         self.loop.set_debug(False)
         self.addCleanup(self.loop.set_debug, debug)
 
-    @asyncio.coroutine
-    def test_setUp(self):
-        yield from self.advance(1)
+    async def test_setUp(self):
+        await self.advance(1)
         self.assertEqual(1, self.loop.time())
 
 
 class Test_ClockedTestCase_async_setUp(asynctest.ClockedTestCase):
-    @asyncio.coroutine
-    def setUp(self):
+    async def setUp(self):
         # Deactivate debug mode if enabled, because it will warn us that the
         # advance() coroutine took 1s.
         debug = self.loop.get_debug()
         self.loop.set_debug(False)
         self.addCleanup(self.loop.set_debug, debug)
 
-        yield from self.advance(1)
+        await self.advance(1)
 
-    @asyncio.coroutine
-    def test_setUp(self):
+    async def test_setUp(self):
         self.assertEqual(1, self.loop.time())
 
 
@@ -506,6 +464,7 @@ class Test_fail_on_decorator(unittest.TestCase):
             case = obj.__self__
 
         try:
+            # pylint: disable=W0212
             return getattr(obj, asynctest._fail_on._FAIL_ON_ATTR).get_checks(case)
         except AttributeError:
             if fatal:
@@ -525,8 +484,7 @@ class Test_fail_on_decorator(unittest.TestCase):
                 self.fail("check '{}' {} (expected: {})".format(
                     check,
                     "enabled" if checks[check] else "disabled",
-                    "enabled" if kwargs[check] else "disabled")
-                )
+                    "enabled" if kwargs[check] else "disabled"))
 
     def test_check_arguments(self):
         message = "got an unexpected keyword argument 'not_existing'"
@@ -605,10 +563,10 @@ class Test_fail_on_decorator(unittest.TestCase):
         self.assert_checks_equal(TestCase(), foo=True, bar=True)
 
         @asynctest.strict()
-        class TestCase(asynctest.TestCase):
+        class TestCase2(asynctest.TestCase):
             pass
 
-        self.assert_checks_equal(TestCase(), foo=True, bar=True)
+        self.assert_checks_equal(TestCase2(), foo=True, bar=True)
 
     def test_lenient_decorator(self):
         @asynctest.lenient
@@ -630,6 +588,8 @@ fail_on_defaults = {"default": True, "optional": False}
 @unittest.mock.patch.dict("asynctest._fail_on.DEFAULTS",
                           values=fail_on_defaults, clear=True)
 class Test_fail_on(_TestCase):
+    # pylint: disable=W0212
+
     def setUp(self):
         self.mocks = {}
         for method in fail_on_defaults:
@@ -676,6 +636,10 @@ class Test_fail_on(_TestCase):
         self.mocks['default'].side_effect = AssertionError
 
         class Dummy_TestCase(asynctest.TestCase):
+            def __init__(self, *args, **kwargs):
+                super().__init__(*args, **kwargs)
+                self.tearDown_called = False
+
             def tearDown(self):
                 self.tearDown_called = True
 
@@ -709,7 +673,7 @@ class Test_fail_on(_TestCase):
 
         for method in self.run_methods:
             with self.subTest(method=method):
-                case = Test.FooTestCase()
+                case = TestCase()
                 getattr(case, method)()
 
                 self.assert_checked("default")
@@ -751,7 +715,7 @@ class Test_fail_on(_TestCase):
 
 @unittest.mock.patch.dict(
     "asynctest._fail_on.DEFAULTS", clear=True,
-    unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'])
+    unused_loop=asynctest._fail_on.DEFAULTS['unused_loop'])  # pylint: disable=W0212
 class Test_fail_on_unused_loop(_TestCase):
     @asynctest.fail_on(unused_loop=True)
     class WithCheckTestCase(Test.FooTestCase):
@@ -796,9 +760,8 @@ class Test_fail_on_unused_loop(_TestCase):
 
         @asynctest.fail_on(unused_loop=True)
         class WithCoroutineTest(asynctest.TestCase):
-            @asyncio.coroutine
-            def runTest(self):
-                yield from []
+            async def runTest(self):
+                await asyncio.sleep(0, self.loop)
 
         @asynctest.fail_on(unused_loop=True)
         class WithFunctionCallingLoopTest(asynctest.TestCase):
@@ -844,8 +807,11 @@ class Test_fail_on_unused_loop(_TestCase):
                 class TestCase(self.WithCheckTestCase):
                     use_default_loop = test_use_default_loop
 
+                    async def cleaup_noop(self):
+                        pass
+
                     def setUp(self):
-                        self.addCleanup(asyncio.coroutine(lambda: None))
+                        self.addCleanup(self.cleaup_noop)
 
                 with self.assertRaisesRegex(
                         AssertionError, 'Loop did not run during the test'):
@@ -872,28 +838,25 @@ class Test_assertAsyncRaises(asynctest.TestCase):
         awaitable.set_result(None)
         return awaitable
 
-    @asyncio.coroutine
-    def test_assertAsyncRaises(self):
+    async def test_assertAsyncRaises(self):
         with self.subTest("exception raised"):
-            yield from self.assertAsyncRaises(self.CustomException,
+            await self.assertAsyncRaises(self.CustomException, self.raising)
+
+        with self.subTest("no exception raised"):
+            with self.assertRaises(AssertionError):
+                await self.assertAsyncRaises(self.CustomException,
+                                             self.finishing)
+
+    async def test_assertAsyncRaisesRegex(self):
+        regex = "CustomException"
+        with self.subTest("exception raised"):
+            await self.assertAsyncRaisesRegex(self.CustomException, regex,
                                               self.raising)
 
         with self.subTest("no exception raised"):
             with self.assertRaises(AssertionError):
-                yield from self.assertAsyncRaises(self.CustomException,
-                                                  self.finishing)
-
-    @asyncio.coroutine
-    def test_assertAsyncRaisesRegex(self):
-        regex = "CustomException"
-        with self.subTest("exception raised"):
-            yield from self.assertAsyncRaisesRegex(self.CustomException,
-                                                   regex, self.raising)
-
-        with self.subTest("no exception raised"):
-            with self.assertRaises(AssertionError):
-                yield from self.assertAsyncRaisesRegex(self.CustomException,
-                                                       regex, self.finishing)
+                await self.assertAsyncRaisesRegex(self.CustomException,
+                                                  regex, self.finishing)
 
 
 class Test_assertAsyncWarns(asynctest.TestCase):
@@ -901,9 +864,7 @@ class Test_assertAsyncWarns(asynctest.TestCase):
         pass
 
     @classmethod
-    @asyncio.coroutine
-    def warns(cls):
-        import warnings
+    async def warns(cls):
         warnings.warn("asynctest warning message", cls.CustomWarning)
 
     @staticmethod
@@ -912,26 +873,24 @@ class Test_assertAsyncWarns(asynctest.TestCase):
         awaitable.set_result(None)
         return awaitable
 
-    @asyncio.coroutine
-    def test_assertAsyncWarns(self):
+    async def test_assertAsyncWarns(self):
         with self.subTest("warning triggered"):
-            yield from self.assertAsyncWarns(self.CustomWarning, self.warns())
+            await self.assertAsyncWarns(self.CustomWarning, self.warns())
 
         with self.subTest("warning not triggered"):
             with self.assertRaises(AssertionError):
-                yield from self.assertAsyncWarns(self.CustomWarning,
-                                                 self.doesnt_warn())
+                await self.assertAsyncWarns(self.CustomWarning,
+                                            self.doesnt_warn())
 
-    @asyncio.coroutine
-    def test_assertAsyncWarnsRegex(self):
+    async def test_assertAsyncWarnsRegex(self):
         regex = "asynctest warning"
         with self.subTest("warning triggered"):
-            yield from self.assertAsyncWarnsRegex(self.CustomWarning, regex,
-                                                  self.warns())
+            await self.assertAsyncWarnsRegex(self.CustomWarning, regex,
+                                             self.warns())
 
         with self.subTest("warning not triggered"):
             with self.assertRaises(AssertionError):
-                yield from self.assertAsyncWarnsRegex(
+                await self.assertAsyncWarnsRegex(
                     self.CustomWarning, regex, self.doesnt_warn())
 
 
