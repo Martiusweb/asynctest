@@ -60,6 +60,22 @@ _async_magics = async_magic_coroutines + ("__aiter__", )
 unittest.mock._return_values["__aexit__"] = False
 
 
+def _as_coroutine(func):
+    """
+    Wraps a regular function `func` in a coroutine, or returns it if it is
+    already awaitable.
+
+    :param func: object to convert to coroutine
+    """
+    if inspect.isawaitable(func):
+        return func
+
+    async def coro_wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    return coro_wrapper
+
+
 def _get_async_iter(mock):
     """
     Factory of ``__aiter__`` magic methods for a MagicMock.
@@ -82,7 +98,7 @@ def _get_async_iter(mock):
         return _AsyncIterator(iterator)
 
     if asyncio.iscoroutinefunction(mock.__aiter__):
-        return asyncio.coroutine(__aiter__)
+        return _as_coroutine(__aiter__)
 
     return __aiter__
 
@@ -96,6 +112,7 @@ _async_magics = set(_async_magics)
 # This changes the behavior of unittest, but the change is minor and is
 # probably better than overriding __set/get/del attr__ everywhere.
 unittest.mock._all_magics |= _async_magics
+
 
 def _raise(exception):
     raise exception
@@ -369,8 +386,7 @@ class Mock(unittest.mock.Mock, metaclass=MockMetaMixin):
     For instance:
 
     >>> class Foo:
-    ...     @asyncio.coroutine
-    ...     def foo(self):
+    ...     async def foo(self):
     ...         pass
     ...
     ...     def bar(self):
@@ -430,8 +446,7 @@ class _AwaitEvent:
         self._mock = mock
         self._condition = None
 
-    @asyncio.coroutine
-    def wait(self, skip=0):
+    async def wait(self, skip=0):
         """
         Wait for await.
 
@@ -442,10 +457,9 @@ class _AwaitEvent:
         def predicate(mock):
             return mock.await_count > skip
 
-        return (yield from self.wait_for(predicate))
+        return await self.wait_for(predicate)
 
-    @asyncio.coroutine
-    def wait_next(self, skip=0):
+    async def wait_next(self, skip=0):
         """
         Wait for the next await.
 
@@ -462,10 +476,9 @@ class _AwaitEvent:
         def predicate(mock):
             return mock.await_count > await_count + skip
 
-        return (yield from self.wait_for(predicate))
+        return await self.wait_for(predicate)
 
-    @asyncio.coroutine
-    def wait_for(self, predicate):
+    async def wait_for(self, predicate):
         """
         Wait for a given predicate to become True.
 
@@ -476,21 +489,20 @@ class _AwaitEvent:
         condition = self._get_condition()
 
         try:
-            yield from condition.acquire()
+            await condition.acquire()
 
             def _predicate():
                 return predicate(self._mock)
 
-            return (yield from condition.wait_for(_predicate))
+            return await condition.wait_for(_predicate)
         finally:
             condition.release()
 
-    @asyncio.coroutine
-    def _notify(self):
+    async def _notify(self):
         condition = self._get_condition()
 
         try:
-            yield from condition.acquire()
+            await condition.acquire()
             condition.notify_all()
         finally:
             condition.release()
@@ -589,24 +601,23 @@ class CoroutineMock(Mock):
             if side_effect is not None and not callable(side_effect):
                 raise
 
-            result = asyncio.coroutine(_raise)(e)
+            result = _as_coroutine(_raise)(e)
         except BaseException as e:
-            result = asyncio.coroutine(_raise)(e)
+            result = _as_coroutine(_raise)(e)
 
         _call = _mock_self.call_args
 
-        @asyncio.coroutine
-        def proxy():
+        async def proxy():
             try:
                 if inspect.isawaitable(result):
-                    return (yield from result)
+                    return await result
                 else:
                     return result
             finally:
                 _mock_self.await_count += 1
                 _mock_self.await_args = _call
                 _mock_self.await_args_list.append(_call)
-                yield from _mock_self.awaited._notify()
+                await _mock_self.awaited._notify()
 
         return proxy()
 
@@ -1005,7 +1016,7 @@ def _decorate_coroutine_callable(func, new_patching):
 
         if is_coroutine_func:
             # asyncio.iscoroutinefunction() returns True
-            patched = asyncio.coroutine(patched)
+            patched = _as_coroutine(patched)
     else:
         patched = patched_factory
 
@@ -1180,13 +1191,11 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     When used as a context manager, the patch is still active even if the
     generator or coroutine is paused, which may affect concurrent tasks::
 
-        @asyncio.coroutine
-        def coro():
+        async def coro():
             with asynctest.mock.patch("module.function"):
-                yield from asyncio.get_event_loop().sleep(1)
+                await asyncio.get_event_loop().sleep(1)
 
-        @asyncio.coroutine
-        def independent_coro():
+        async def independent_coro():
             assert not isinstance(module.function, asynctest.mock.Mock)
 
         asyncio.create_task(coro())
@@ -1196,19 +1205,6 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
 
     :param scope: :const:`asynctest.GLOBAL` or :const:`asynctest.LIMITED`,
         controls when the patch is activated on generators and coroutines
-
-    When used as a decorator with a generator based coroutine, the order of
-    the decorators matters. The order of the ``@patch()`` decorators is in
-    the reverse order of the parameters produced by these patches for the
-    patched function. And the ``@asyncio.coroutine`` decorator should be
-    the last since ``@patch()`` conceptually patches the coroutine, not
-    the function::
-
-        @patch("module.function2")
-        @patch("module.function1")
-        @asyncio.coroutine
-        def test_coro(self, mock_function1, mock_function2):
-            yield from asyncio.get_event_loop().sleep(1)
 
     see :func:`unittest.mock.patch()`.
 
