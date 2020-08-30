@@ -49,6 +49,8 @@ import unittest
 import sys
 import warnings
 
+from typing import final
+
 from unittest.case import *  # NOQA
 
 import asynctest.selector
@@ -234,7 +236,8 @@ class TestCase(unittest.TestCase):
             loop._selector = asynctest.selector.TestSelector(loop._selector)
 
         return loop
-
+    
+    @final
     def _setUp(self):
         self._init_loop()
 
@@ -251,7 +254,8 @@ class TestCase(unittest.TestCase):
 
         # don't take into account if the loop ran during setUp
         self.loop._asynctest_ran = False
-
+    
+    @final
     def _tearDown(self):
         if asyncio.iscoroutinefunction(self.tearDown):
             self.loop.run_until_complete(self.tearDown())
