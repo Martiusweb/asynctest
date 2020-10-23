@@ -55,7 +55,7 @@ edge-cases, such as the ones happening in a real-world scenario in a large
 network.
 
 Even worse, using mocks in place of files will often raise :exc:`OSError`
-because these obhjects are not compatible with the features of the system used
+because these objects are not compatible with the features of the system used
 by the loop.
 
 :mod:`asynctest` provides special mocks which can be used in place of actual
