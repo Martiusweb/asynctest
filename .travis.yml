@@ -114,6 +114,25 @@ matrix:
     - os: linux
       language: python
       python: pypy3
+   #Adding the power supoort architecture
+    - os: linux
+      language: python
+      python: 3.5
+      arch: ppc64le
+    - os: linux
+      language: python
+      python: 3.6
+      arch: ppc64le
+    - os: linux
+      language: python
+      python: &python_major_ver 3.7
+      dist: xenial
+      sudo: true
+      arch: ppc64le
+    - os: linux
+      language: python
+      python: 3.6-dev
+      arch: ppc64le
   allow_failures:
     - os: osx
       env: NAME="Python 3.6-dev"
@@ -127,6 +146,10 @@ matrix:
       python: 3.7-dev
     - os: linux
       python: 3.8-dev
+   #Power Support jobs
+    - os: linux
+      python: 3.6-dev
+      arch: ppc64le
 
 install:
 - curl https://bootstrap.pypa.io/get-pip.py | python
