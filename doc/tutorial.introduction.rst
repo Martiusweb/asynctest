@@ -1,7 +1,7 @@
 Introduction
 ============
 
-Asynctest is a library which extends the standard pacakge :mod:`unittest` to
+Asynctest is a library which extends the standard package :mod:`unittest` to
 support asyncio features.
 
 This tutorial aims at gathering examples showing how to use :mod:`asynctest`.

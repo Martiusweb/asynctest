@@ -42,7 +42,7 @@
         Enable checks on the loop state after a test ran to help testers to
         identify common mistakes.
 
-        Enable or disable a check using a keywork argument with a boolean
+        Enable or disable a check using a keyword argument with a boolean
         value::
 
             @asynctest.fail_on(unused_loop=True)
@@ -72,7 +72,7 @@
         The decorator of a method has a greater priority than the decorator of
         a class. When :func:`~asynctest.fail_on` decorates a class and one of
         its methods with conflicting arguments, those of the class are
-        overriden.
+        overridden.
 
         Subclasses of a decorated :class:`~asynctest.TestCase` inherit of the
         checks enabled on the parent class.

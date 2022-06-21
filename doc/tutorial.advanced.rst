@@ -73,7 +73,7 @@ These mocks are configured with a spec matching common file-like objects.
  :class:`~asynctest.SSLSocketMock`   :class:`ssl.SSLSocket`
 =================================== ========================================
 
-We can use :func:`asynctest.isfilemock()` to differenciate mocks from regular
+We can use :func:`asynctest.isfilemock()` to differentiate mocks from regular
 objects.
 
 As of :mod:`asynctest` 0.12, these mocks don't provide other features, and must
@@ -106,7 +106,7 @@ Advanced users may not be able to use the loop provided by
 :class:`~asyncio.TestCase` because they use a customized event loop policy (see
 :py:ref:`asyncio-policies`). It is often the case when using an alternative
 implementation (like `uvloop <https://uvloop.readthedocs.io/>`_) or if the
-tests are integrated within a framework hidding the scheduling and management
+tests are integrated within a framework hiding the scheduling and management
 of the loop.
 
 It is possible to force the :class:`~asynctest.TestCase` to use the loop
