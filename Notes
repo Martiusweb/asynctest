@@ -59,4 +59,4 @@ included in the base "package"
 Most of those features are features I implemented or should have implemented in
 order to get a clean unit test codebase for my project(s) using asyncio.
 I am looking for a wishlist of features and feedbacks about what you missed
-when writting tests for asyncio libraries, or that made you not write tests.
+when writing tests for asyncio libraries, or that made you not write tests.

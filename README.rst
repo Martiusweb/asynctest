@@ -103,7 +103,7 @@ Mock and CoroutineMock
     CoroutineMock object by default, according to the patched target,
 
   - patch(), patch.object(), patch.multiple() handle generators and coroutines
-    and their behavior can be controled when the generator or coroutine pauses,
+    and their behavior can be controlled when the generator or coroutine pauses,
 
   - all the patch() methods can decorate coroutine functions,
 

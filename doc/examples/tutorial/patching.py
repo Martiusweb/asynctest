@@ -54,7 +54,7 @@ class TestMustBePatched(asynctest.TestCase):
         self.checked = asyncio.Event()
 
         # This task checks if the object is patched continuously, and sets
-        # the checked event everytime it does so.
+        # the checked event every time it does so.
         self.background_task = asyncio.create_task(
             must_be_patched.crash_if_patched(self.checked))
 

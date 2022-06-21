@@ -42,7 +42,7 @@ user is added to the cache, yet all the assertions in the test are checked.
 
 In this example, the bug would be detected thanks to the other test. However,
 it might not be the case with a more complex implementation. The key to write a
-a better test is to enforce all the assumtions and requirements stated in the
+a better test is to enforce all the assumptions and requirements stated in the
 documentation.
 
 Currently, the test can be described this way:
@@ -76,7 +76,7 @@ notified of the number of users added to the cache.
    :pyobject: TestUsingMock
 
 In this example, client is a :class:`~asynctest.Mock`. This mock will reproduce
-the interface of ``Client()`` (an instance of the ``Client`` class, ommited for
+the interface of ``Client()`` (an instance of the ``Client`` class, omitted for
 simplicity, available in the example file :doc:`examples/tutorial/mocking.py`).
 
 By default, the attributes of a mock object are themselves mocks. We call them
@@ -132,7 +132,7 @@ example:
 .. literalinclude:: examples/tutorial/mocking.py
    :pyobject: TestUsingCoroutineMock
 
-All the features of :class:`asynctest.CoroutineMock` are decribed in the
+All the features of :class:`asynctest.CoroutineMock` are described in the
 reference documentation.
 
 Mocking of other objects
@@ -236,7 +236,7 @@ There are several types of mocks with slightly different features:
   :class:`~asynctest.NonCallableMagicMock` are their non-callable counterparts.
   It's usually better to use them when mocking objects or values.
 * :class:`~asynctest.CoroutineMock` mocks a coroutine function (or, more
-  generaly, any callable object returning an awaitable).
+  generally, any callable object returning an awaitable).
 
 As mentioned before, a *child mock* is a mock attached to another mock. The
 child mock is either an attribute of the parent mock, or the result of a call
@@ -402,7 +402,7 @@ Asynchronous context manager
 :class:`~asynctest.CoroutineMock` returning a new child mock.
 
 If an exception is raised in an ``async with`` block, this exception is passed
-to ``__aexit__()``. In this case, the return value defines wether the
+to ``__aexit__()``. In this case, the return value defines whether the
 interpreter suppresses or propagates the exception, as described in the
 documentation of :meth:`object.__exit__`.
 
@@ -496,7 +496,7 @@ like in all the previous examples.
 When an object is hard to mock, it sometimes shows a limitation in the design:
 a coupling that is too tight, the use of a global variable (or a singleton),
 etc. However, it's not always possible or desirable to change the code to
-accomodate the tests. A common situation where tight coupling is almost
+accommodate the tests. A common situation where tight coupling is almost
 invisible is when performing logging or monitoring. In this case, patching will
 help.
 
@@ -568,7 +568,7 @@ applied to a coroutine with the argument ``scope``.
 If ``scope`` is set to :data:`asynctest.LIMITED`, the patch is active only when
 the coroutine is running.
 
-This situation is illustrated in the example bellow. The test case
+This situation is illustrated in the example below. The test case
 ``TestMustBePatched`` runs a task in background which fails if some patch is
 active. It contains two tests: one which shows the test conflicting, and one
 which uses the :data:`~asynctest.LIMITED` ``scope`` to deactivate the patch
@@ -583,13 +583,13 @@ task checked once that the patch is not active. The code of
 available in the example file :doc:`examples/tutorial/patching.py`.
 
 ``test_patching_conflicting()`` fails because the patch is still active when it
-is paused and aways the ``self.checked`` event. While paused, the background
+is paused and always the ``self.checked`` event. While paused, the background
 task runs, and crashes because the patch is still active.
 
 In ``test_patching_not_conflicting()``, the patch is set with a
 :data:`~asynctest.LIMITED` scope, and is active only when the coroutine runs.
 When ``await must_be_patched.is_patched()`` runs, the patch is still active.
-This coroutine runs in the scope of the outher coroutine (the test): indeed,
+This coroutine runs in the scope of the other coroutine (the test): indeed,
 ``must_be_patched.is_patched()`` is scheduled in the task running the test.
 
 Conclusion

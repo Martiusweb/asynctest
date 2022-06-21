@@ -1170,7 +1170,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     Since asynctest 0.13, each instance of the generator or coroutine will have
     its own set of patches. When several instances of the same coroutine are
     running concurrently, they will patch the same target. If ``new`` is left
-    to its default vaue, the patched target is subject to a race condition. At
+    to its default value, the patched target is subject to a race condition. At
     some point, its value might not be the same as the one passed to the extra
     argument.
 
@@ -1215,7 +1215,7 @@ def patch(target, new=DEFAULT, spec=None, create=False, spec_set=None,
     .. versionadded:: 0.6 patch into generators and coroutines with
                       a decorator.
 
-    .. versionadded:: 0.13 patchs are now associated with a generator or
+    .. versionadded:: 0.13 patches are now associated with a generator or
                       coroutine instance instead of the function.
     """
     getter, attribute = unittest.mock._get_target(target)
